@@ -21,7 +21,7 @@ static int 				g_num_funcs;
 static uint64_t 		g_entry_func;
 static int 				NUMFUNC = 200;
 static int 				NUMBLOCK = 150;
-static int 				NUMEDGE = 100;
+static int 				NUMEDGE = 150;
 
 //-----------------------------------------------------------------------------
 // Part 1: Generate a list of functions. At current stage, we omit the building
@@ -115,7 +115,7 @@ int gen_func_list(cs_insn *ins, int count)
 	func_start_list == NULL;
 
 	//dumpout the func_list
-	dump_func_list();
+	//dump_func_list();
 	// - set the entry function (e.g., main()) of the code
 	//TODO
 	return g_num_funcs;
@@ -126,7 +126,7 @@ int gen_func_list(cs_insn *ins, int count)
 // Helper functions for this part
 // Note: for clear view of boundaries, leave 3 blank lines between functions.
 // Hint: once your function is over 60 lines (or 3+ levels of indentation), 
-//	it is highly likely that the complexity of its work is too complicated
+//	it is highly likely that the complexity of its work is too complicatedfunc_list_append
 //	(i.e., consisting of several sub-tasks that can be decoupled neatly). 
 //	In this case, you should use helper functions to implement these 
 //	sub-tasks, thereby making your code in good modularity and maintainence
@@ -236,9 +236,8 @@ void gen_cfg(cs_insn *insn)
 	}
 	for (int i = 0; i < g_num_funcs + 1; i++) {
 		func = &g_func_list[i];
-		//gen_cfg_edges(func, insn);
-		//printf("%d", func->cfg.num_edges);
-		//dump_cfg_edges(func);
+		gen_cfg_edges(func, insn);
+		dump_cfg_edges(func);
 	}
 }
 
@@ -265,7 +264,7 @@ static void gen_cfg_nodes(Func *func, cs_insn *insn)
 	
 	cfg.nodes = (CFG_Node*)malloc(sizeof(CFG_Node)*(num_node_entries+1));
 	// dump_node_entries(num_node_entries&node_entries, node_entries);
-	dump_node_entries(func, node_entries, num_node_entries);
+	//dump_node_entries(func, node_entries, num_node_entries);
 	// generate  cfg.num_nodes from node_entries
 	for(i = 0; i < num_node_entries + 1; i++)
 	{
@@ -280,8 +279,13 @@ static void gen_cfg_nodes(Func *func, cs_insn *insn)
 		total_len += node->len;
 	}
 	func->cfg.num_nodes = num_node_entries;
+	
+	//initialized for edges
+	func->cfg.num_edges = -1;
+	func->cfg.edges = (CFG_Edge*)malloc(sizeof(CFG_Edge)*NUMEDGE);
+
 	// dump_cfg_nodes(...);
-	dump_cfg_nodes(func);
+	//dump_cfg_nodes(func);
 	// release the memory allocated for node_entries
 	free(node_entries);
 	node_entries = NULL;
@@ -397,58 +401,54 @@ static void new_edges(Func *func, CFG_Node *src, cs_insn *insn)
 
 	// 2) new a control-transfer edge, if any
 	// dst = search_node(func, dst_addr)
-	int i, index, id;
+
+	//Variables
+	int index, id;
 	cs_riscv *riscv;
-	uint64_t addr, Jmp_addr, Next_addr, offset;
-	func->cfg.num_edges = -1;
-	func->cfg.edges = (CFG_Edge*)malloc(sizeof(CFG_Edge)*NUMEDGE);
-	index = find_index(insn, src->start_addr);       //find the func start instruction index
-	for(i = index; i < src->len + index; i++)     //traverse the instructions in the function
+	uint64_t addr, Jmp_addr, Next_addr, offset; 
+	index = find_index(insn, src->start_addr);//find the func start instruction index
+	cs_insn ins = insn[index + src->len - 1];//the last instruction
+	riscv = &(ins.detail->riscv);
+	id = ins.id;
+	addr = ins.address;
+
+
+	if(ins.detail->groups[0] == 1)						//branch instruction
 	{
-		riscv = &(insn[i].detail->riscv);
-		id = insn[i].id;
-		addr = insn[i].address;
-		if(insn[i].detail->groups[0] == 1)						//branch instruction
-		{
-			offset = riscv->operands[2].imm;
-			Next_addr = addr + 0x4;
-			Jmp_addr = addr + offset;
-			//sequnce block
-			CFG_Edge *seq_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
-			seq_edge->src = src;
-			seq_edge->dst = search_node(func, Next_addr);
-			seq_edge->type = 2;
-			seq_edge->src->out[0] = seq_edge;
-			seq_edge->dst->in[++seq_edge->dst->num_in] = seq_edge;
+		offset = riscv->operands[2].imm;
+		Next_addr = addr + 0x4;
+		Jmp_addr = addr + offset;
+		//sequnce block
+		CFG_Edge *seq_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
+		seq_edge->src = src;
+		seq_edge->dst = search_node(func, Next_addr);
+		seq_edge->type = 2;
+		seq_edge->src->out[0] = seq_edge;
+		seq_edge->dst->in[++seq_edge->dst->num_in] = seq_edge;
+		
 
-			//branch jump block
-			CFG_Edge *jmp_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
-			jmp_edge->src = src;
-			jmp_edge->dst = search_node(func, Jmp_addr);
-			jmp_edge->type = 1;
-			jmp_edge->src->out[1] = jmp_edge;
-			jmp_edge->dst->in[++jmp_edge->dst->num_in] = jmp_edge;
+		//branch jump block
+		CFG_Edge *jmp_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
+		jmp_edge->src = src;
+		jmp_edge->dst = search_node(func, Jmp_addr);
+		jmp_edge->type = 1;
+		jmp_edge->src->out[1] = jmp_edge;
+		jmp_edge->dst->in[++jmp_edge->dst->num_in] = jmp_edge;
 
-			//update the func->cfg.edges
-			func->cfg.edges[++func->cfg.num_edges] = *seq_edge;
-			func->cfg.edges[++func->cfg.num_edges] = *jmp_edge;
-		}
-		/* for function call
-		if(id == 206 && riscv->operands[0].reg != 1)
-		{	
-			offset = riscv->operands[2].imm;
-			Next_addr = addr + 0x4;
-			Jmp_addr = addr + offset;
-			CFG_Edge *jmp_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
-			jmp_edge->src = src;
-			jmp_edge->dst = search_node_func(Jmp_addr);
-			if(jmp_edge->dst == NULL)
-				printf("Cannot find the node start with %ld\n", Jmp_addr);
-			jmp_edge->type = 1;
-			jmp_edge->src->out[1] = jmp_edge;
-			jmp_edge->dst->in[++jmp_edge->dst->num_in] = jmp_edge;
-		}
-		*/
+		//update the func->cfg.edges
+		func->cfg.edges[++func->cfg.num_edges] = *seq_edge;
+		func->cfg.edges[++func->cfg.num_edges] = *jmp_edge;
+	}	
+	else if(isJal(id, riscv->operands[0].reg))
+	{	
+		Jmp_addr = addr + riscv->operands[1].imm;
+		CFG_Edge *jal_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
+		jal_edge->src = src;
+		jal_edge->dst = search_node_jal(Jmp_addr);
+		jal_edge->type = 0;
+		jal_edge->src->out[0] = jal_edge;
+		jal_edge->dst->in[++jal_edge->dst->num_in] = jal_edge;
+		func->cfg.edges[++func->cfg.num_edges] = *jal_edge;
 	}
 }
 
@@ -467,7 +467,7 @@ static CFG_Node* search_node(Func *func, uint64_t start_addr)
 
 
 
-static CFG_Node* search_node_func(uint64_t start_addr)// for function call 
+static CFG_Node* search_node_jal(uint64_t start_addr)// for function call 
 {													  // inter function block edge
 	CFG_Node 	*node;
 	int i;
@@ -476,6 +476,7 @@ static CFG_Node* search_node_func(uint64_t start_addr)// for function call
 			return &g_func_list[i].cfg.nodes[0];
 	return NULL;
 }
+
 
 
 
@@ -513,13 +514,16 @@ static void dump_cfg_nodes(Func *func)
 static void dump_cfg_edges(Func *func)
 {
 	int i;
+	printf("------------------------------------------------------------------------\n");
+	printf("the func start address is 0x%08lx\n", func->start_addr);
 	for(i = 0; i < func->cfg.num_edges + 1; i++)
 	{
-		
-		printf("The src id is %d",func->cfg.edges[i].src->id);
-		printf("The dst id is %d",func->cfg.edges[i].dst->id);
-		printf("The type is %d",func->cfg.edges[i].type);
+		printf("The %d edges information: \n",i);
+		printf("The src id is %d\n",func->cfg.edges[i].src->id);
+		printf("The dst id is %d\n",func->cfg.edges[i].dst->id);
+		printf("The type is %d\n\n",func->cfg.edges[i].type);
 	}
+	printf("------------------------------------------------------------------------\n\n");
 	
 }
 
