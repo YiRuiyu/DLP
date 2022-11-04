@@ -19,9 +19,9 @@
 static Func 			*g_func_list;
 static int 				g_num_funcs;
 static uint64_t 		g_entry_func;
-static int 				NUMFUNC = 200;
-static int 				NUMBLOCK = 150;
-static int 				NUMEDGE = 150;
+static int 				NUMFUNC = 50;
+static int 				NUMBLOCK = 40;
+static int 				NUMEDGE = 200;
 
 //-----------------------------------------------------------------------------
 // Part 1: Generate a list of functions. At current stage, we omit the building
@@ -149,10 +149,17 @@ static bool isJal(int id, int reg)
 
 
 
+static bool isRet(int id)
+{
+	return id == 207;
+}
+
+
+
 static uint64_t* func_list_append(uint64_t address, cs_riscv *riscv, uint64_t *func_start_list)
 {
 	//check if overflow
-	isFull(g_num_funcs, &NUMFUNC, func_start_list);
+	isFull(g_num_funcs, &NUMFUNC, &func_start_list);
 					
 	//lookup the target address in the func start address list
 	//insert a new start address in the funct start address list
@@ -236,7 +243,9 @@ void gen_cfg(cs_insn *insn)
 	}
 	for (int i = 0; i < g_num_funcs + 1; i++) {
 		func = &g_func_list[i];
+		
 		gen_cfg_edges(func, insn);
+		
 		dump_cfg_edges(func);
 	}
 }
@@ -299,6 +308,7 @@ static void gen_cfg_edges(Func *func, cs_insn *insn)
 	// generate edges by checking the last instruction of each node, and
 	// update the in/out edges for the corresponding nodes
 	CFG_Node 	*node;
+	
 	for (int i = 0; i < func->cfg.num_nodes + 1; i++) {
 		node = &func->cfg.nodes[i];
 		new_edges(func, node, insn);
@@ -345,12 +355,23 @@ static int get_node_entries(Func *func, const cs_insn *insn, uint64_t **node_ent
 
 
 
-static void isFull(int num, int *max, uint64_t *list)
+static void isFull(int num, int *max, uint64_t **list)
 {
-	if(num == *max)
+	if(num + 1 == *max)
 	{
 		*max *= 2;
-		list = (uint64_t*)realloc(list, *max);
+		*list = (uint64_t*)realloc(*list, *max*sizeof(uint64_t));
+	}
+}
+
+
+
+static void EdgeisFull(int num, int *max, CFG_Edge **list)//the only problem is how to enlarge the edge array ???
+{
+	if(num+1 == *max)
+	{
+		*max *= 2;
+		*list = (CFG_Edge*)realloc(*list, *max*sizeof(CFG_Edge));
 	}
 }
 
@@ -366,11 +387,11 @@ static uint64_t* bran_append(cs_insn ins, uint64_t *list, int *num)
 	Jmpaddr = ins.address + offset;
 	Nextaddr = ins.address + 0x4;
 
-	isFull(*num, &NUMBLOCK, list);
+	isFull(*num, &NUMBLOCK, &list);
 	if(!check_dup(list, Nextaddr, *num))
 		list[++*num] = Nextaddr;
 	
-	isFull(*num, &NUMBLOCK, list);
+	isFull(*num, &NUMBLOCK, &list);
 	if(!check_dup(list, Jmpaddr, *num))
 		list[++*num] = Jmpaddr;
 	
@@ -384,7 +405,7 @@ static uint64_t* jal_append(cs_insn ins, uint64_t *list, int *num)
 	uint64_t Nextaddr;
 	Nextaddr = ins.address + 0x4;
 
-	isFull(*num, &NUMBLOCK, list);
+	isFull(*num, &NUMBLOCK, &list);
 	if(!check_dup(list, Nextaddr, *num))
 		list[++*num] = Nextaddr;
 	
@@ -422,7 +443,7 @@ static void new_edges(Func *func, CFG_Node *src, cs_insn *insn)
 		CFG_Edge *seq_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
 		seq_edge->src = src;
 		seq_edge->dst = search_node(func, Next_addr);
-		seq_edge->type = 2;
+		seq_edge->type = fallthrough;
 		seq_edge->src->out[0] = seq_edge;
 		seq_edge->dst->in[++seq_edge->dst->num_in] = seq_edge;
 		
@@ -431,12 +452,14 @@ static void new_edges(Func *func, CFG_Node *src, cs_insn *insn)
 		CFG_Edge *jmp_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
 		jmp_edge->src = src;
 		jmp_edge->dst = search_node(func, Jmp_addr);
-		jmp_edge->type = 1;
+		jmp_edge->type = ctrltrans;
 		jmp_edge->src->out[1] = jmp_edge;
 		jmp_edge->dst->in[++jmp_edge->dst->num_in] = jmp_edge;
-
+		
 		//update the func->cfg.edges
+		//EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
 		func->cfg.edges[++func->cfg.num_edges] = *seq_edge;
+		//EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
 		func->cfg.edges[++func->cfg.num_edges] = *jmp_edge;
 	}	
 	else if(isJal(id, riscv->operands[0].reg))
@@ -445,10 +468,23 @@ static void new_edges(Func *func, CFG_Node *src, cs_insn *insn)
 		CFG_Edge *jal_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
 		jal_edge->src = src;
 		jal_edge->dst = search_node_jal(Jmp_addr);
-		jal_edge->type = 0;
+		jal_edge->type = functioncall;
 		jal_edge->src->out[0] = jal_edge;
 		jal_edge->dst->in[++jal_edge->dst->num_in] = jal_edge;
+		//EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
 		func->cfg.edges[++func->cfg.num_edges] = *jal_edge;
+	}
+	else if(!isRet(id) && (addr != func->start_addr + 0x4*(func->len-1)))
+	{	
+		Next_addr = addr + 0x4;
+		CFG_Edge *fall_edge = (CFG_Edge*)malloc(sizeof(CFG_Edge));
+		fall_edge->src = src;
+		fall_edge->dst = search_node(func, Next_addr);
+		fall_edge->type = fallthrough;
+		fall_edge->src->out[0] = fall_edge;printf("the num is %d\n",fall_edge->dst->num_in);
+		fall_edge->dst->in[++fall_edge->dst->num_in] = fall_edge;
+		//EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
+		func->cfg.edges[++func->cfg.num_edges] = *fall_edge;
 	}
 }
 
@@ -462,6 +498,7 @@ static CFG_Node* search_node(Func *func, uint64_t start_addr)
 	for(i = 0; i < func->cfg.num_nodes+1; i++)
 		if(func->cfg.nodes[i].start_addr == start_addr)
 			return &func->cfg.nodes[i];
+	printf("Could not find node in this func\n");
 	return NULL;
 }
 
@@ -474,6 +511,7 @@ static CFG_Node* search_node_jal(uint64_t start_addr)// for function call
 	for(i = 0; i < g_num_funcs + 1; i++)
 		if(g_func_list[i].start_addr == start_addr)
 			return &g_func_list[i].cfg.nodes[0];
+	printf("Could not find node in this func\n");
 	return NULL;
 }
 
