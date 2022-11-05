@@ -64,6 +64,7 @@ static CFG_Node* gen_node(Func *func, int i, uint64_t *node_entries, int num_nod
 static int get_node_entries(Func *func, const cs_insn *insn, uint64_t **node_entries);
 static void new_edges(Func *func, CFG_Node *src, cs_insn *insn);
 static CFG_Edge* gen_edge(Func *func, CFG_Node *src, uint64_t addr, edgetype type);
+static void edge_append(Func *func, CFG_Edge *edge);
 static CFG_Node* search_node(Func *func, uint64_t start_addr);
 static CFG_Node* search_node_jal(uint64_t start_addr);
 static int find_index(const cs_insn *insn, uint64_t addr);

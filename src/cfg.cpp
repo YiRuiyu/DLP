@@ -447,24 +447,20 @@ static void new_edges(Func *func, CFG_Node *src, cs_insn *insn)
 		CFG_Edge *jmp_edge = gen_edge(func, src, Jmp_addr, ctrltrans);
 		
 		//update the func->cfg.edges
-		EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
-		func->cfg.edges[++func->cfg.num_edges] = *seq_edge;
-		EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
-		func->cfg.edges[++func->cfg.num_edges] = *jmp_edge;
+		edge_append(func, seq_edge);
+		edge_append(func, jmp_edge);
 	}	
 	else if(isJal(id, riscv->operands[0].reg))
 	{	
 		Jmp_addr = addr + riscv->operands[1].imm;
 		CFG_Edge *jal_edge = gen_edge(func, src, Jmp_addr, functioncall);
-		EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
-		func->cfg.edges[++func->cfg.num_edges] = *jal_edge;
+		edge_append(func, jal_edge);
 	}
 	else if(!isRet(id) && (addr != func->start_addr + 0x4*(func->len-1)))
 	{	
 		Next_addr = addr + 0x4;
 		CFG_Edge *fall_edge = gen_edge(func, src, Next_addr, fallthrough);
-		EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
-		func->cfg.edges[++func->cfg.num_edges] = *fall_edge;
+		edge_append(func, fall_edge);
 	}
 	
 }
@@ -483,6 +479,14 @@ static CFG_Edge* gen_edge(Func *func, CFG_Node *src, uint64_t addr, edgetype typ
 	edge->src->out[0] = edge;
 	edge->dst->in[++edge->dst->num_in] = edge;
 	return edge;
+}
+
+
+
+static void edge_append(Func *func, CFG_Edge *edge)
+{
+	EdgeisFull(func->cfg.num_edges, &NUMEDGE, &func->cfg.edges);
+	func->cfg.edges[++func->cfg.num_edges] = *edge;
 }
 
 
