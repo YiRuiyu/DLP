@@ -88,7 +88,8 @@ int gen_func_list(cs_insn *ins, int count)
 		//isJal and not J
 		if(isJal(id, riscv->operands[0].reg))
             func_start_list = func_list_append(addr, riscv, func_start_list);	
-        else continue;
+        else 
+			continue;
 	}
 
 	// 2. Generate the function list from the start address list
@@ -105,7 +106,8 @@ int gen_func_list(cs_insn *ins, int count)
 		//for the last instruction of this function
 		if(i != g_num_funcs)
 			g_func_list[i].len = len;
-		else g_func_list[i].len = count - total_len;
+		else 
+			g_func_list[i].len = count - total_len;
 		total_len += len;
 	}
 	

@@ -13,12 +13,14 @@
 #include "../include/BinaryCode.h"
 #include "../include/Disasm.h"
 #include "../include/cfg.h"
+#include "../include/loop.h"
 
 int main (void)
 {
     //testcode();
     //testdisasm();
-    testcfg();
+    //testcfg();
+    testloop();
     return 0;
 }
 
