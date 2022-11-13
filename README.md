@@ -10,3 +10,7 @@
 
 ### 编译：
     $ g++ *.cpp -lcapstone
+    
+### 文件目录
+    ./include .h头文件
+    ./src     .cpp源文件 .txt输出示例
