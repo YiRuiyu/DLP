@@ -13,7 +13,7 @@ typedef struct LOOP_T{
     int         id;
     uint64_t    start_addr;
     uint64_t    end_addr;
-    LOOP_T    *inside[MAX_INSIDE];
+    LOOP_T      *inside[MAX_INSIDE];
     int         num; 
 } LOOP;
 

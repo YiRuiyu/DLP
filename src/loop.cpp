@@ -108,15 +108,14 @@ static void count_nested()
 	int temp_id;
 	for(i = 0; i < num_loops + 1; i++)
 	{
-        temp_id = i;
-		for(j = 0; j < num_loops - i; j++)
+		for(j = i + 1; j < num_loops - i + 1; j++)
 		{
             if(loop[i].start_addr >= loop[j].start_addr)
-                if(loop[j].start_addr >= loop[temp_id].start_addr && loop[j].end_addr < loop[temp_id].end_addr)
-                    temp_id = j;
-        }
-        if(temp_id != i)
-            loop[temp_id].inside[++loop[temp_id].num] = &loop[i];
+            {
+                loop[j].inside[++loop[j].num] = &(loop[i]);
+                break;
+            }
+        }        
 	}
 }
 
@@ -124,11 +123,16 @@ static void count_nested()
 
 static void dump_loop()
 {
-    int i;
+    int i, j;
 	for(i = 0; i < num_loops + 1; i++)
     {
-        printf("The %d Loop start address is 0x%08lx,end address is 0x%08lx\n",i ,loop[i].start_addr, loop[i].end_addr);
-        printf("The %d Loop has %d nested loop\n\n", i, loop[i].num + 1);
+        printf("The %d Loop start address is 0x%08lx, end address is 0x%08lx\n", i, loop[i].start_addr, loop[i].end_addr);
+        printf("The %d Loop has %d nested loop\n", i, loop[i].num + 1);
+        for(j = 0; j < loop[i].num + 1; j++)
+        {
+            printf("The nested loop id is %d, start addr is 0x%08lx, end addr is 0x%08lx\n", loop[i].inside[j]->id, loop[i].inside[j]->start_addr, loop[i].inside[j]->end_addr);
+        }
+        printf("\n\n");
     }
 }
 
