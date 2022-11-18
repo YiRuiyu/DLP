@@ -250,7 +250,7 @@ void gen_cfg(cs_insn *insn)
 		NUMEDGE = 50;
 		gen_cfg_edges(func, insn);
 		
-		dump_cfg_edges(func);
+		//dump_cfg_edges(func);
 	}
 }
 
@@ -590,4 +590,18 @@ void testcfg(void)
 		gen_func_list(insn, count);
 		gen_cfg(insn);
     }
+}
+
+
+
+const Func** get_func()
+{
+	return (const Func**)&g_func_list;
+}
+
+
+
+const int* get_func_num()
+{
+	return &g_num_funcs;
 }

@@ -5,7 +5,7 @@
 // 
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "../include/Disasm.h"
+#include "../include/cfg.h"
 #define MAX_INSIDE 10
 
 struct LOOP_T;

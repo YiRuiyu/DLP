@@ -25,28 +25,36 @@ static int 				NUMNESTED = 10;
 // Part 1: Generate Loop Area 
 // Traverse the instcutions find the Loop Area
 //-----------------------------------------------------------------------------
-static void gen_loop(cs_insn *insn, int count)
+static void gen_loop()
 {
     //Variables:
-    int i;
+    int i, j;
+    const int *num_funcs = get_func_num();
+
+    uint64_t addr, Jmp_addr;
+
     num_loops = -1;
     LOOP *temp;
-    uint64_t addr, Jmp_addr, Next_addr, offset; 
     loop = (LOOP*) malloc(sizeof(LOOP)*NUMLOOP);
-    //Traverse and Find start, end address
-    for(i = 0; i < count; i++)
-    {
-        if(isBranch(insn[i]))
-        {
-            addr = insn[i].address;
-            cs_riscv *riscv = &(insn[i].detail->riscv);
-            offset = riscv->operands[2].imm;
-		    Jmp_addr = addr + offset;
-            //generate loop
-		    temp = isLoop(Jmp_addr, addr);
-            loop_append(temp);
-        }
-        else continue;
+
+    CFG_Edge 	*edge;
+    const Func *func;
+    const Func **func_list = get_func();
+    
+    //Traverse cfg find edges pointing to forward blocks
+    for (i = 0; i < *num_funcs + 1; i++) {              //every func
+        func = &((*func_list)[i]);
+        for (j = 0; j < func->cfg.num_edges + 1; j++) {  //every edge
+		    edge = &func->cfg.edges[j];
+            if(edge->type == ctrltrans)
+            {
+                addr = edge->src->start_addr + edge->src->len;
+                Jmp_addr = edge->dst->start_addr;
+                temp = isLoop(Jmp_addr, addr);
+                loop_append(temp);
+            }
+            
+	    }
     }
     //Traverse loops and Check if there are nested loops
     count_nested();
@@ -154,7 +162,8 @@ void testloop(void)
 
     	//Disassemblying the bit stream
     	insn = Disasm(Code_Hex, address, Code.length()/2, count);
-
-		gen_loop(insn, count);
+        gen_func_list(insn, count);
+		gen_cfg(insn);
+		gen_loop();
     }
 }
