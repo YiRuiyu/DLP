@@ -24,8 +24,7 @@ static int 				NUMNESTED = 10;
 //-----------------------------------------------------------------------------
 // Part 1: Generate Loop Area 
 // Traverse the instcutions find the Loop Area
-//-----------------------------------------------------------------------------
-static void gen_loop()
+void gen_loop()
 {
     //Variables:
     int i, j;
@@ -38,19 +37,19 @@ static void gen_loop()
     loop = (LOOP*) malloc(sizeof(LOOP)*NUMLOOP);
 
     CFG_Edge 	*edge;
-    const Func *func;
+    Func *func;
     const Func **func_list = get_func();
     
     //Traverse cfg find edges pointing to forward blocks
     for (i = 0; i < *num_funcs + 1; i++) {              //every func
-        func = &((*func_list)[i]);
+        func = (Func *)&((*func_list)[i]);
         for (j = 0; j < func->cfg.num_edges + 1; j++) {  //every edge
 		    edge = &func->cfg.edges[j];
             if(edge->type == ctrltrans)
             {
                 addr = edge->src->start_addr + edge->src->len;
                 Jmp_addr = edge->dst->start_addr;
-                temp = isLoop(Jmp_addr, addr);
+                temp = isLoop(Jmp_addr, addr, func);
                 loop_append(temp);
             }
             
@@ -59,7 +58,7 @@ static void gen_loop()
     //Traverse loops and Check if there are nested loops
     count_nested();
     //dump out loop list
-    dump_loop();
+    //dump_loop();
 }
 
 
@@ -72,7 +71,7 @@ static bool isBranch(cs_insn ins)
 
 
 
-static LOOP* isLoop(uint64_t jump, uint64_t addr)
+static LOOP* isLoop(uint64_t jump, uint64_t addr, Func *func)
 {
     if(jump < addr)
     {
@@ -81,6 +80,7 @@ static LOOP* isLoop(uint64_t jump, uint64_t addr)
         temp->start_addr = jump;
         temp->end_addr = addr;
         temp->num = -1;
+        temp->func = func;
         return temp;
     }
     else return NULL; 
@@ -166,4 +166,16 @@ void testloop(void)
 		gen_cfg(insn);
 		gen_loop();
     }
+}
+
+
+const LOOP** get_loop(void)
+{
+    return (const LOOP**)&loop;
+}
+
+
+const int* get_loop_num(void)
+{
+	return &num_loops;
 }

@@ -14,13 +14,15 @@
 #include "../include/Disasm.h"
 #include "../include/cfg.h"
 #include "../include/loop.h"
+#include "../include/pcg.h"
 
 int main (void)
 {
     //testcode();
     //testdisasm();
     //testcfg();
-    testloop();
+    //testloop();
+    testpcg();
     return 0;
 }
 
