@@ -22,16 +22,15 @@
 
 const int       *num_funcs = get_func_num();
 const int       *num_loops = get_loop_num();
-const LOOP      **loop = get_loop();
+const LOOP      **loop_list = get_loop();
 const Func      **func_list = get_func();
 
 //-----------------------------------------------------------------------------
 // Part 0: Global variables 
 // Those invisible to other modules should be guarded with static keyword
 //-----------------------------------------------------------------------------
-static PCG_FUNC *pcg_func_list;
-
-
+static int          num_pcg_func;
+static PCG_FUNC    *pcg_func_list;
 //-----------------------------------------------------------------------------
 // Part 1: Generate producer list for each block in each function
 //
@@ -41,7 +40,9 @@ static PCG_FUNC *pcg_func_list;
 void gen_pcg(cs_insn *insns)
 {
     PCG_FUNC        *pcg_func;
-    pcg_func_list = (PCG_FUNC*)malloc(sizeof(PCG_FUNC)*(*num_funcs));
+
+
+    num_pcg_func = get_looped_func(&pcg_func_list, loop_list);
     for (int i = 0; i < *num_funcs + 1; i++)
     {
         pcg_func_list[i].func = (Func*)&(*func_list)[i];
@@ -218,6 +219,51 @@ static void aft_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
             default: continue;
         }
     }
+}
+
+
+static int get_looped_func(PCG_FUNC **pcg_list, LOOP **loop_list)
+{
+    for(int i = 0; i < *num_loops; i++)
+        find_nested_loop(&loop[i]);
+}
+
+
+static LOOP* find_nested_loop(PCG_FUNC **pcg_list, LOOP *loop)
+{
+    int       num;
+    LOOP     *temp_loop;
+    LOOP     *nested_loops[20] = {nullptr};
+
+    num = 0;
+    nested_loops[0] = loop;
+    while(num >= 0)
+    {
+        temp_loop = nested_loops[0];
+        num = num -1;
+        if(temp_loop->num >= 0)
+        {
+            for(int i = 0; i < num; i++)
+                nested_loops[i] = nested_loops[i + 1];
+            for(int i = 0; i < temp_loop->num; i++)
+            {
+                num = num + 1;
+                nested_loops[num] = temp_loop->inside[i];
+            }  
+        }
+        else    
+            for(int i = 0; i <= num; i++)
+            {
+                nested_loops[i] = nested_loops[i + 1];
+            } 
+
+        //TODO: nested_loops array has been finished. array is need to be counted
+            
+    }
+        
+    
+        
+    
 }
 
 
