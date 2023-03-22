@@ -41,6 +41,8 @@ static void gen_func_pcg(PCG_FUNC *pcg_func, cs_insn *insn);
 static void in_block_link(PCG_BLOCK *block, cs_insn *insn);
 static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *block, cs_insn *insns);
 static void aft_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *insns);
+static int get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops);
+static int find_nested_loop(const LOOP **nested_loops, const LOOP *loop);
 static void find_in_produce(PCG_BLOCK *block, cs_insn *insns, int base, int offset, int pos);
 static void find_out_produce(PCG_FUNC *pcg_func, PCG_BLOCK *block, int *pre_block_list, int num_list, cs_insn *ins, int offset, int pos);
 static bool is_compute(int opcount);

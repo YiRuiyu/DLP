@@ -47,7 +47,7 @@ void gen_loop()
 		    edge = &func->cfg.edges[j];
             if(edge->type == ctrltrans)
             {
-                addr = edge->src->start_addr + edge->src->len;
+                addr = edge->src->start_addr + (edge->src->len - 1) * 0x4;
                 Jmp_addr = edge->dst->start_addr;
                 temp = isLoop(Jmp_addr, addr, func);
                 loop_append(temp);

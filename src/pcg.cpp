@@ -222,48 +222,63 @@ static void aft_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
 }
 
 
-static int get_looped_func(PCG_FUNC **pcg_list, LOOP **loop_list)
+static int get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
 {
+    int     num_nested;
+    const LOOP     *nested_loops[20] = {nullptr};
+
     for(int i = 0; i < *num_loops; i++)
-        find_nested_loop(&loop[i]);
-}
-
-
-static LOOP* find_nested_loop(PCG_FUNC **pcg_list, LOOP *loop)
-{
-    int       num;
-    LOOP     *temp_loop;
-    LOOP     *nested_loops[20] = {nullptr};
-
-    num = 0;
-    nested_loops[0] = loop;
-    while(num >= 0)
     {
-        temp_loop = nested_loops[0];
-        num = num -1;
+        num_nested = find_nested_loop(nested_loops, &(*loops)[i]);//nested_loops need to be freshed
+}
+    }
+        
+
+
+static int find_nested_loop(const LOOP **nested_loops, const LOOP *loop)
+{        
+    const LOOP     *temp_loop;
+    const LOOP     *buffer[20] = {nullptr};
+    int             nested_id[20];
+    int             num_nested;
+    int             num_buf;
+
+    num_nested = -1;
+    num_buf = 0;
+    buffer[0] = loop;
+    if(loop->num < 0)
+        return -1;
+
+
+    while(num_buf >= 0)
+    {
+        temp_loop = buffer[0];
+        for(int i = 0; i < num_buf + 1; i++)
+                buffer[i] = buffer[i + 1];
+        num_buf = num_buf -1;
+
         if(temp_loop->num >= 0)
         {
-            for(int i = 0; i < num; i++)
-                nested_loops[i] = nested_loops[i + 1];
-            for(int i = 0; i < temp_loop->num; i++)
+
+            for(int j = 0; j <= temp_loop->num; j++)
             {
-                num = num + 1;
-                nested_loops[num] = temp_loop->inside[i];
+                num_buf = num_buf + 1;
+                buffer[num_buf] = temp_loop->inside[j];
             }  
         }
         else    
-            for(int i = 0; i <= num; i++)
-            {
-                nested_loops[i] = nested_loops[i + 1];
-            } 
-
-        //TODO: nested_loops array has been finished. array is need to be counted
-            
+        {
+            num_nested = num_nested + 1;
+            nested_loops[num_nested] = temp_loop;
+        }
+        
     }
-        
-    
-        
-    
+    for(int i = 0; i < num_nested + 1; i++)
+    {
+        printf("The %d Loop start address is 0x%08lx, end address is 0x%08lx\n", i, nested_loops[i]->start_addr, nested_loops[i]->end_addr);
+        printf("The %d Loop has %d nested loop\n", i, nested_loops[i]->num + 1);
+    }        
+    return num_nested;
 }
 
 
@@ -310,7 +325,7 @@ static int find_post_block(int **post_block_list,PCG_FUNC *pcg_func, PCG_BLOCK *
     node = block->node;
     for(int i = 0; i < *num_loops + 1; i++)                                                                              //find which loop this 
     {
-        if(node->start_addr >= (*loop)[i].start_addr && node->start_addr <= (*loop)[i].end_addr)
+        if(node->start_addr >= (*loop_list)[i].start_addr && node->start_addr <= (*loop_list)[i].end_addr)
         {
             num++;
             *post_block_list[num] = node->id;
@@ -319,7 +334,7 @@ static int find_post_block(int **post_block_list,PCG_FUNC *pcg_func, PCG_BLOCK *
             
         for(int j = node->id; j < func->cfg.num_nodes; j++)
         {
-            if(func->cfg.nodes[j].start_addr >= (*loop)[i].start_addr && func->cfg.nodes[j].start_addr + func->cfg.nodes[j].len*0x4 <= (*loop[i]).end_addr)
+            if(func->cfg.nodes[j].start_addr >= (*loop_list)[i].start_addr && func->cfg.nodes[j].start_addr + func->cfg.nodes[j].len*0x4 <= (*loop_list)[i].end_addr)
             {
                 num++;
                 *post_block_list[num] = j;
@@ -465,6 +480,8 @@ void testpcg(void)
 		gen_func_list(insn, count);
 		gen_cfg(insn);
         gen_loop();
-        gen_pcg(insn);
+        //gen_pcg(insn);
+        get_looped_func(&pcg_func_list, loop_list);
+        //find_nested_loop(&pcg_func_list, &(*loop_list)[21]);
     }
 }
