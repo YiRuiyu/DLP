@@ -56,9 +56,10 @@ void gen_loop()
 	    }
     }
     //Traverse loops and Check if there are nested loops
+    //sort_nested();    No need sort by start_addr already in increasing end_addr
     count_nested();
     //dump out loop list
-    //dump_loop();
+    ////dump_loop();
 }
 
 
@@ -129,11 +130,15 @@ static void count_nested()
 
 
 
+
+
+
 static void dump_loop()
 {
     int i, j;
 	for(i = 0; i < num_loops + 1; i++)
     {
+        printf("The %d Loop is belong to the func start at 0x%08lx\n", i, loop[i].func->start_addr);
         printf("The %d Loop start address is 0x%08lx, end address is 0x%08lx\n", i, loop[i].start_addr, loop[i].end_addr);
         printf("The %d Loop has %d nested loop\n", i, loop[i].num + 1);
         for(j = 0; j < loop[i].num + 1; j++)

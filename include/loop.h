@@ -27,6 +27,7 @@ static LOOP* isLoop(uint64_t jump, uint64_t addr, Func *func);
 static void  loop_append(LOOP *temp);
 static void  LoopisFull(int num, int *max, LOOP **list);
 static void  count_nested();
+static void  sort_nested();
 static void  dump_loop();
 const LOOP** get_loop(void);
 const int*   get_loop_num(void);

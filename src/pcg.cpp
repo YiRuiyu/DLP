@@ -16,21 +16,26 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////////////
 //TODO: about the branch which is easy to separated from the instructions with group
+//      cfg did not consider ret as function end.
 
 #include "../include/pcg.h"
 #include "../include/BinaryCode.h" //only for testing
 
+#define MAX_NESTED 30
+
 const int       *num_funcs = get_func_num();
 const int       *num_loops = get_loop_num();
-const LOOP      **loop_list = get_loop();
 const Func      **func_list = get_func();
+const LOOP      **loop_list = get_loop();
 
 //-----------------------------------------------------------------------------
 // Part 0: Global variables 
 // Those invisible to other modules should be guarded with static keyword
 //-----------------------------------------------------------------------------
-static int          num_pcg_func;
-static PCG_FUNC    *pcg_func_list;
+static int              num_nested;
+static const LOOP     **nested_loops;
+static int              num_pcg_func;
+static PCG_FUNC        *pcg_func_list;
 //-----------------------------------------------------------------------------
 // Part 1: Generate producer list for each block in each function
 //
@@ -42,7 +47,7 @@ void gen_pcg(cs_insn *insns)
     PCG_FUNC        *pcg_func;
 
 
-    num_pcg_func = get_looped_func(&pcg_func_list, loop_list);
+    get_looped_func(&pcg_func_list, loop_list);
     for (int i = 0; i < *num_funcs + 1; i++)
     {
         pcg_func_list[i].func = (Func*)&(*func_list)[i];
@@ -115,7 +120,7 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
         }
         
     }
-
+    //dump_produce();
     //gen_non_consume();
 }
 /*for(i=(block->node->start_addr+block->node->len)-1;i>block->node->start_addr-1;i--)//From block's bottom traverse to top
@@ -222,32 +227,49 @@ static void aft_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
 }
 
 
-static int get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
+static void get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
 {
-    int     num_nested;
-    const LOOP     *nested_loops[20] = {nullptr};
+    nested_loops = (const LOOP**)malloc(MAX_NESTED * sizeof(LOOP*));
+    num_nested = -1;
+    num_pcg_func = -1;
 
-    for(int i = 0; i < *num_loops; i++)
+    for(int i = 0; i < *num_loops; i++)                             
+        find_nested_loop(nested_loops, &num_nested, &(*loops)[i]);
+
+    sort_loop(nested_loops, num_nested);                                    
+    dump_nested();
+
+    *pcg_list = (PCG_FUNC*)malloc(num_nested * sizeof(PCG_FUNC));
+    for(int i = 0; i < num_nested + 1; i++)                                 //get funcs where the loops belong to
     {
-        num_nested = find_nested_loop(nested_loops, &(*loops)[i]);//nested_loops need to be freshed
-}
+        if(i == 0)
+        {
+            num_pcg_func += 1;
+            (*pcg_list)[num_pcg_func].func = nested_loops[i]->func;
+        }
+        else if(nested_loops[i]->func != (*pcg_list)[num_pcg_func].func)
+        {
+            num_pcg_func += 1;
+            (*pcg_list)[num_pcg_func].func = nested_loops[i]->func;
+        }
+        else continue;
     }
+    dump_pcg_func_list();
+    return ;
+}
         
 
 
-static int find_nested_loop(const LOOP **nested_loops, const LOOP *loop)
+static void find_nested_loop(const LOOP **nested_loops, int *num_nested, const LOOP *loop)
 {        
     const LOOP     *temp_loop;
-    const LOOP     *buffer[20] = {nullptr};
-    int             nested_id[20];
-    int             num_nested;
+    const LOOP     *buffer[MAX_NESTED] = {nullptr};
     int             num_buf;
 
-    num_nested = -1;
     num_buf = 0;
     buffer[0] = loop;
     if(loop->num < 0)
-        return -1;
+        return ;
 
 
     while(num_buf >= 0)
@@ -266,20 +288,46 @@ static int find_nested_loop(const LOOP **nested_loops, const LOOP *loop)
                 buffer[num_buf] = temp_loop->inside[j];
             }  
         }
-        else    
+        else  
         {
-            num_nested = num_nested + 1;
-            nested_loops[num_nested] = temp_loop;
+            if(!check_duplicate(nested_loops, num_nested, temp_loop))
+            {
+                *num_nested = *num_nested + 1;
+                nested_loops[*num_nested] = temp_loop;
+            }    
         }
         
-    }
-    for(int i = 0; i < num_nested + 1; i++)
-    {
-        printf("The %d Loop start address is 0x%08lx, end address is 0x%08lx\n", i, nested_loops[i]->start_addr, nested_loops[i]->end_addr);
-        printf("The %d Loop has %d nested loop\n", i, nested_loops[i]->num + 1);
     }        
-    return num_nested;
 }
+
+
+static bool check_duplicate(const LOOP** nested_loops, int *num_nested, const LOOP* temp_loop)
+{
+    for (int i = 0; i < *num_nested + 1; i++) {
+        if (nested_loops[i] == temp_loop) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+static void sort_loop(const LOOP **list, int len)
+{
+    int i, j;
+    const LOOP *temp;
+
+    for (i = 0; i < len + 1; i++) {
+        for (j = 0; j < len - i; j++) {
+            if (list[j]->start_addr > list[j+1]->start_addr || (list[j]->start_addr == list[j+1]->start_addr && list[j]->end_addr > list[j+1]->end_addr)) {
+                temp = list[j];
+                list[j] = list[j+1];
+                list[j+1] = temp;
+            }
+        }
+    }
+}
+
 
 
 static int isMissing(PCG_LINK **producers, int index)                       //TODO: Change it into 2-dimention array, and return 1 if op1 producer is missing, same with 2. all find is 0
@@ -408,6 +456,31 @@ void dump_pcg()
 }
 
 
+static void dump_nested()
+{
+    for(int i = 0; i < num_nested + 1; i++)
+        printf("The %d Loop start address is 0x%08lx, end address is 0x%08lx\n", i, nested_loops[i]->start_addr, nested_loops[i]->end_addr);
+    printf("\n");
+}
+
+
+static void dump_pcg_func_list()
+{
+    for(int i = 0; i < num_pcg_func + 1; i++)
+        printf("The %d pcg func start address is 0x%08lx\n", i , pcg_func_list[i].func->start_addr); 
+    printf("\n");
+}
+
+
+// static void dump_produce()
+// {
+//     for(int i = 0; i < num_pcg_func + 1; i++)
+//     {
+//         pcg_func_list[i].blocks
+//     }
+// }
+
+
 //determine whether insn is RV32I computing instruction
 /*
 static bool iscompute(int id){
@@ -480,8 +553,6 @@ void testpcg(void)
 		gen_func_list(insn, count);
 		gen_cfg(insn);
         gen_loop();
-        //gen_pcg(insn);
-        get_looped_func(&pcg_func_list, loop_list);
-        //find_nested_loop(&pcg_func_list, &(*loop_list)[21]);
+        gen_pcg(insn);
     }
 }
