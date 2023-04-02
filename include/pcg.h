@@ -11,21 +11,22 @@
 #ifndef PCG_H
 #define PCG_H
 
-typedef enum LINK_TYPE{ inblock = 1, preblock, lastloop, none_consumed } linktype;
+typedef enum SRC_TYPE{ LoopConst = 1, CurrIter, PrevIter, PrevSelf, AddrInduct, NonConsume, NOTFIND } srctype;
 
 typedef struct PCG_LINK_T{
     int             id;                         //producer instruction index or non-consumed instruction index
-    cs_riscv_op     *op;                        //procuder                   or non-consumed producer
-    linktype        type;                       //link type                  or non-consumed hint
+    cs_riscv_op    *op;                         //procuder                   or non-consumed producer
+    srctype         type;                       //link type                  or non-consumed hint
+    PCG_LINK_T     *next;                       //next possible producer
 }PCG_LINK;
 
 
 typedef struct PCG_BLOCK_T{
-    CFG_Node        *node;                      //pointer to block
-    PCG_LINK        **producer;                 //producer list
-    int             num_prod;                   //not used
-    PCG_LINK        *non_consume;               //none consumed list
-    int             num_non;
+    CFG_Node        *node;                       //pointer to block
+    PCG_LINK       **producer;                   //producer list which is a 2D array storing pointer to PCG_LINK
+    int              num_prod;                   //not used
+    PCG_LINK        *non_consume;                //none consumed list
+    int              num_non;
 }PCG_BLOCK;
 
 
@@ -54,6 +55,7 @@ static int isMissing(PCG_LINK **producers, int index);
 static int find_pre_block(int **pre_block_list, PCG_BLOCK *block);
 static int find_post_block(int **post_block_list,PCG_FUNC *pcg_func, PCG_BLOCK *block);
 static bool cmp_op(PCG_LINK *link, cs_insn *ins,int position);
+static void init(PCG_BLOCK* pcg_block);
 static void dump_nested();
 static void dump_pcg_func_list();
 static void dump_produce();

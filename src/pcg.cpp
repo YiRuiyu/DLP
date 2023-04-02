@@ -45,15 +45,15 @@ static PCG_FUNC        *pcg_func_list;
 void gen_pcg(cs_insn *insns)
 {
     PCG_FUNC        *pcg_func;
-
+    int i, j, x, y;
 
     get_looped_func(&pcg_func_list, loop_list);
-    for (int i = 0; i < *num_funcs + 1; i++)
+    for (int i = 0; i < num_pcg_func + 1; i++)
     {
-        pcg_func_list[i].func = (Func*)&(*func_list)[i];
         pcg_func = &(pcg_func_list[i]);
         gen_func_pcg(pcg_func, insns);
     }
+    dump_produce();
 }
 
 //Help function for this Part
@@ -70,13 +70,11 @@ static void gen_func_pcg(PCG_FUNC *pcg_func, cs_insn *insns)
     for (int i = 0; i < pcg_func->func->cfg.num_nodes + 1; i++) {
 		pcg_func->blocks[i].node = &pcg_func->func->cfg.nodes[i];
         pcg_block = &(pcg_func->blocks[i]);
-
-		in_block_link(pcg_block, insns);                                 //Generate the in-block PCG completing *producer and *non_consume
-        //pre_block_link(pcg_func, pcg_block, insns);                      //Fill out-block data in PCG with the help of *non_consume and CFG
-        //aft_block_link(pcg_func, pcg_block, insns);                                   //If the instruction is in a loop, the producer can be generated in last loop which is in the block after it
+		in_block_link(pcg_block, insns);                                  //Generate the in-block PCG completing *producer and *non_consume
+        //pre_block_link(pcg_func, pcg_block, insns);                       //Fill out-block data in PCG with the help of *non_consume and CFG
+        //aft_block_link(pcg_func, pcg_block, insns);                       //If the instruction is in a loop, the producer can be generated in last loop which is in the block after it
 	}
-
-    
+    //dump_produce();
 }
 
 
@@ -92,14 +90,15 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
     int          base;
     cs_insn     *this_ins;
 
-    pcg_block->producer=(PCG_LINK**)calloc((pcg_block->node->len)*2,sizeof(PCG_LINK));      //2d array for producers
+    pcg_block->producer=(PCG_LINK**)calloc(pcg_block->node->len,sizeof(PCG_LINK));      //2d array for producers
     for(int i = 0; i <= pcg_block->node->len; i++)
-        pcg_block->producer[i] = (PCG_LINK *)calloc(2, sizeof(PCG_LINK));
-        
+        pcg_block->producer[i] = (PCG_LINK*)calloc(2, sizeof(PCG_LINK));
+    
     pcg_block->non_consume=(PCG_LINK*)calloc(pcg_block->node->len,sizeof(PCG_LINK));
+    init(pcg_block);                                                                        //set all element as nullptr
     //we divide in block analysis into two parts,computing insn and mem insn
     //analyze computing insn part 
-
+    
     base = (pcg_block->node->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4;
     for(int offset = pcg_block->node->len - 1; offset >= 0; offset--)                   //From block's bottom traverse to top
     {
@@ -120,9 +119,10 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
         }
         
     }
-    //dump_produce();
-    //gen_non_consume();
+    // gen_non_consume();
 }
+
+//@HYC
 /*for(i=(block->node->start_addr+block->node->len)-1;i>block->node->start_addr-1;i--)//From block's bottom traverse to top
 {
     if(is_auipc(insns[i].detail->riscv.op_count,insns[i].id))//if current insn is auipc there is no consumer so skip this turn
@@ -166,7 +166,7 @@ static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     int          index;
     PCG_BLOCK   *pre_block;
     cs_insn     *this_ins;                                                                  //current instruciton
-
+    
     num_list = find_pre_block(&pre_block_list, pcg_block);
     //TODO: find the start index of this block
     base = pcg_block->node->start_addr/0x4;
@@ -174,7 +174,7 @@ static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     {
         index = base + offset;
         this_ins = &insns[index];
-
+        
         switch(isMissing(pcg_block->producer, offset))                                               //have not found producer in in-block checking
         {
             case 1:
@@ -237,7 +237,7 @@ static void get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
         find_nested_loop(nested_loops, &num_nested, &(*loops)[i]);
 
     sort_loop(nested_loops, num_nested);                                    
-    dump_nested();
+    //dump_nested();
 
     *pcg_list = (PCG_FUNC*)malloc(num_nested * sizeof(PCG_FUNC));
     for(int i = 0; i < num_nested + 1; i++)                                 //get funcs where the loops belong to
@@ -254,79 +254,10 @@ static void get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
         }
         else continue;
     }
-    dump_pcg_func_list();
+    //dump_pcg_func_list();
     return ;
 }
         
-
-
-static void find_nested_loop(const LOOP **nested_loops, int *num_nested, const LOOP *loop)
-{        
-    const LOOP     *temp_loop;
-    const LOOP     *buffer[MAX_NESTED] = {nullptr};
-    int             num_buf;
-
-    num_buf = 0;
-    buffer[0] = loop;
-    if(loop->num < 0)
-        return ;
-
-
-    while(num_buf >= 0)
-    {
-        temp_loop = buffer[0];
-        for(int i = 0; i < num_buf + 1; i++)
-                buffer[i] = buffer[i + 1];
-        num_buf = num_buf -1;
-
-        if(temp_loop->num >= 0)
-        {
-
-            for(int j = 0; j <= temp_loop->num; j++)
-            {
-                num_buf = num_buf + 1;
-                buffer[num_buf] = temp_loop->inside[j];
-            }  
-        }
-        else  
-        {
-            if(!check_duplicate(nested_loops, num_nested, temp_loop))
-            {
-                *num_nested = *num_nested + 1;
-                nested_loops[*num_nested] = temp_loop;
-            }    
-        }
-        
-    }        
-}
-
-
-static bool check_duplicate(const LOOP** nested_loops, int *num_nested, const LOOP* temp_loop)
-{
-    for (int i = 0; i < *num_nested + 1; i++) {
-        if (nested_loops[i] == temp_loop) {
-            return true;
-        }
-    }
-    return false;
-}
-
-
-static void sort_loop(const LOOP **list, int len)
-{
-    int i, j;
-    const LOOP *temp;
-
-    for (i = 0; i < len + 1; i++) {
-        for (j = 0; j < len - i; j++) {
-            if (list[j]->start_addr > list[j+1]->start_addr || (list[j]->start_addr == list[j+1]->start_addr && list[j]->end_addr > list[j+1]->end_addr)) {
-                temp = list[j];
-                list[j] = list[j+1];
-                list[j+1] = temp;
-            }
-        }
-    }
-}
 
 
 
@@ -402,20 +333,22 @@ static void find_in_produce(PCG_BLOCK *pcg_block, cs_insn *insns, int base, int 
     //printf("Base = %d\n", base);
     //printf("Offset = %d\n", offset);
     this_ins = &insns[base + offset];
-    
-    for(int i = base + offset; i > base; i--)
+    for(int i = base + offset - 1; i >= base; i--)                                   // -1 is for get rid of this_ins itself
     {
         //printf("This iteration is %d\n", i);
         //printf("The k value is %d\n", pos);
         //for this_ins, this first half statement is aiming avoiding IMMs and the rest is for avoiding sw/sb/sh which cannot serve as producer
-        if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH))             
-            if(this_ins->detail->riscv.operands[pos].reg == insns[i].detail->riscv.operands[0].reg)
-            {
-                pcg_block->producer[offset][pos-1].id       = i - base;
-                pcg_block->producer[offset][pos-1].type     = inblock;
-                pcg_block->producer[offset][pos-1].op       = &insns[i].detail->riscv.operands[0];
-                break;
-            }
+        if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH) && this_ins->detail->riscv.operands[pos].reg == insns[i].detail->riscv.operands[0].reg)
+        {
+            pcg_block->producer[offset][pos-1].id       = i - base;
+            pcg_block->producer[offset][pos-1].type     = CurrIter;
+            pcg_block->producer[offset][pos-1].op       = &insns[i].detail->riscv.operands[0];
+            break;
+        }
+        else if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_IMM)
+        {
+            pcg_block->producer[offset][pos-1].type     = LoopConst;
+        }
     }
 }
 
@@ -449,6 +382,104 @@ static bool cmp_op(PCG_LINK *link, cs_insn *ins,int position)
 }
 
 
+static void init(PCG_BLOCK* pcg_block)
+{
+    // Initialize producers to nullptr
+    for(int i = 0; i < pcg_block->node->len; i++) {
+        for(int j = 0; j < 2; j++) {
+            pcg_block->producer[i][j].op = nullptr;
+            pcg_block->producer[i][j].id = -1;
+            pcg_block->producer[i][j].type = NOTFIND;
+        }
+    }
+
+    // Initialize non_consume to nullptr
+    for(int i = 0; i < pcg_block->node->len; i++) {
+        pcg_block->non_consume[i].op = nullptr;
+        pcg_block->non_consume[i].id = -1;
+        pcg_block->non_consume[i].type = NOTFIND;
+    }
+}
+
+
+
+//-----------------------------------------------------------------------------
+// Help Function: Find nested loop
+//
+// Output: pcg_func_list
+//-----------------------------------------------------------------------------
+static void find_nested_loop(const LOOP **nested_loops, int *num_nested, const LOOP *loop)
+{        
+    const LOOP     *temp_loop;
+    const LOOP     *buffer[MAX_NESTED] = {nullptr};
+    int             num_buf;
+
+    num_buf = 0;
+    buffer[0] = loop;
+    if(loop->num < 0)
+        return ;
+
+
+    while(num_buf >= 0)
+    {
+        temp_loop = buffer[0];
+        for(int i = 0; i < num_buf + 1; i++)
+                buffer[i] = buffer[i + 1];
+        num_buf = num_buf -1;
+
+        if(temp_loop->num >= 0)
+        {
+
+            for(int j = 0; j <= temp_loop->num; j++)
+            {
+                num_buf = num_buf + 1;
+                buffer[num_buf] = temp_loop->inside[j];
+            }  
+        }
+        else  
+        {
+            if(!check_duplicate(nested_loops, num_nested, temp_loop))
+            {
+                *num_nested = *num_nested + 1;
+                nested_loops[*num_nested] = temp_loop;
+            }    
+        }
+        
+    }        
+}
+
+
+static bool check_duplicate(const LOOP** nested_loops, int *num_nested, const LOOP* temp_loop)
+{
+    for (int i = 0; i < *num_nested + 1; i++) {
+        if (nested_loops[i] == temp_loop) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+static void sort_loop(const LOOP **list, int len)
+{
+    int i, j;
+    const LOOP *temp;
+
+    for (i = 0; i < len + 1; i++) {
+        for (j = 0; j < len - i; j++) {
+            if (list[j]->start_addr > list[j+1]->start_addr || (list[j]->start_addr == list[j+1]->start_addr && list[j]->end_addr > list[j+1]->end_addr)) {
+                temp = list[j];
+                list[j] = list[j+1];
+                list[j+1] = temp;
+            }
+        }
+    }
+}
+
+
+//-----------------------------------------------------------------------------
+//Dump out
+//-----------------------------------------------------------------------------
 void dump_pcg()
 {
     //for each func
@@ -472,13 +503,18 @@ static void dump_pcg_func_list()
 }
 
 
-// static void dump_produce()
-// {
-//     for(int i = 0; i < num_pcg_func + 1; i++)
-//     {
-//         pcg_func_list[i].blocks
-//     }
-// }
+static void dump_produce()
+{
+    int i, j, x, y;
+    for(i = 0; i < num_pcg_func + 1; i++)
+        for(j = 0; j < pcg_func_list[i].func->cfg.num_nodes + 1; j++)
+            for(x = 0; x < pcg_func_list[i].func->cfg.nodes[j].len; x++)
+                for(y = 0; y < 2; y++)
+                {
+                    if(pcg_func_list[i].blocks[j].producer[x][y].type != NOTFIND)
+                        printf("The %2d Func %3d Block %3d Ins %3d rs' PRODUCE is %3d ins and type is %2d\n", i, j, x, y, pcg_func_list[i].blocks[j].producer[x][y].id, pcg_func_list[i].blocks[j].producer[x][y].type);
+                }
+}
 
 
 //determine whether insn is RV32I computing instruction
