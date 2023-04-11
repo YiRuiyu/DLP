@@ -53,7 +53,7 @@ void gen_pcg(cs_insn *insns)
         pcg_func = &(pcg_func_list[i]);
         gen_func_pcg(pcg_func, insns);
     }
-    dump_produce();
+    //dump_produce();
 }
 
 //Help function for this Part
@@ -102,9 +102,9 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
     base = (pcg_block->node->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4;
     for(int offset = pcg_block->node->len - 1; offset >= 0; offset--)                   //From block's bottom traverse to top
     {
+        this_ins = &insns[base + offset];
         //printf("Base = %d\n", base);
         //printf("Offset = %d\n", offset);
-        this_ins = &insns[base + offset];
         //printf("0x%" PRIx64 "\n", this_ins->address);
         if(is_auipc(this_ins->detail->riscv.op_count,this_ins->id))                   //TODO: To be considered
             continue;
@@ -113,13 +113,14 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
             for(int k=1; k<=2; k++)                                                 //for rs1 and rs2 
                 find_in_produce(pcg_block, insns, base, offset, k);
         }
-        else
-        {
-            //TODO: memory access
-        }
+        //load do not have producers
+        else if(this_ins->id == RISCV_INS_LB|| this_ins->id == RISCV_INS_LBU || this_ins->id == RISCV_INS_LD || this_ins->id == RISCV_INS_LH ||this_ins->id == RISCV_INS_LHU || this_ins->id == RISCV_INS_LW|| this_ins->id == RISCV_INS_LWU ||this_ins->id == RISCV_INS_LUI) 
+            continue;  
+        //store have producers
+        else if(this_ins->id == RISCV_INS_SW|| this_ins->id ==RISCV_INS_SB ||this_ins->id == RISCV_INS_SH)                                                                           
+            find_in_produce(pcg_block, insns, base, offset, 0); 
         
     }
-    // gen_non_consume();
 }
 
 //@HYC
@@ -168,7 +169,6 @@ static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     cs_insn     *this_ins;                                                                  //current instruciton
     
     num_list = find_pre_block(&pre_block_list, pcg_block);
-    //TODO: find the start index of this block
     base = pcg_block->node->start_addr/0x4;
     for(int offset = 0; offset < pcg_block->node->len; offset++)                                               //for each instruction
     {
@@ -278,7 +278,7 @@ static int isMissing(PCG_LINK **producers, int index)                       //TO
 static int find_pre_block(int **pre_block_list, PCG_BLOCK *block)
 {
     CFG_Node    *node;
-    int         num;
+    int          num;
 
     num = -1;
     node = block->node;
@@ -337,17 +337,36 @@ static void find_in_produce(PCG_BLOCK *pcg_block, cs_insn *insns, int base, int 
     {
         //printf("This iteration is %d\n", i);
         //printf("The k value is %d\n", pos);
+        if(pos == 0)                                                                                                                          //this ins is store instruction
+        { 
+            //for this_ins, this first half statement is aiming avoiding IMMs and the rest is for avoiding sw/sb/sh which cannot serve as producer, besides the operand cannot be ZERO
+            if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH) && this_ins->detail->riscv.operands[pos].reg == insns[i].detail->riscv.operands[0].reg && this_ins->detail->riscv.operands[pos].reg != 1)
+            {
+                pcg_block->producer[offset][pos].id       = i - base;
+                pcg_block->producer[offset][pos].type     = CurrIter;
+                pcg_block->producer[offset][pos].op       = &insns[i].detail->riscv.operands[0];
+                break;
+            }
+        }
+        if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_IMM)
+        {
+            pcg_block->producer[offset][pos-1].type     = LoopConst;
+        }
+        else if(insns[i].id == RISCV_INS_LB||RISCV_INS_LBU||RISCV_INS_LD||RISCV_INS_LH||RISCV_INS_LHU||RISCV_INS_LW||RISCV_INS_LWU)                //the produce insn is LW
+            if(this_ins->detail->riscv.operands[pos].reg == insns[i].detail->riscv.operands[0].mem.base)
+            {
+                pcg_block->producer[offset][pos-1].id       = i - base;
+                pcg_block->producer[offset][pos-1].type     = CurrIter;
+                pcg_block->producer[offset][pos-1].op       = &insns[i].detail->riscv.operands[0];
+                break;
+            }
         //for this_ins, this first half statement is aiming avoiding IMMs and the rest is for avoiding sw/sb/sh which cannot serve as producer
-        if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH) && this_ins->detail->riscv.operands[pos].reg == insns[i].detail->riscv.operands[0].reg)
+        else if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH) && this_ins->detail->riscv.operands[pos].reg == insns[i].detail->riscv.operands[0].reg && this_ins->detail->riscv.operands[pos].reg != 1)
         {
             pcg_block->producer[offset][pos-1].id       = i - base;
             pcg_block->producer[offset][pos-1].type     = CurrIter;
             pcg_block->producer[offset][pos-1].op       = &insns[i].detail->riscv.operands[0];
             break;
-        }
-        else if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_IMM)
-        {
-            pcg_block->producer[offset][pos-1].type     = LoopConst;
         }
     }
 }
@@ -396,10 +415,16 @@ static void init(PCG_BLOCK* pcg_block)
     // Initialize non_consume to nullptr
     for(int i = 0; i < pcg_block->node->len; i++) {
         pcg_block->non_consume[i].op = nullptr;
-        pcg_block->non_consume[i].id = -1;
+        pcg_block->non_consume[i].id = i;
         pcg_block->non_consume[i].type = NOTFIND;
     }
 }
+
+
+// static void gen_non_consume()
+// {
+
+// }
 
 
 
@@ -501,6 +526,12 @@ static void dump_pcg_func_list()
         printf("The %d pcg func start address is 0x%08lx\n", i , pcg_func_list[i].func->start_addr); 
     printf("\n");
 }
+
+
+// static void dump_pre_block(int *list)
+// {
+
+// }
 
 
 static void dump_produce()

@@ -25,7 +25,7 @@ typedef struct PCG_BLOCK_T{
     CFG_Node        *node;                       //pointer to block
     PCG_LINK       **producer;                   //producer list which is a 2D array storing pointer to PCG_LINK
     int              num_prod;                   //not used
-    PCG_LINK        *non_consume;                //none consumed list
+    PCG_LINK        *non_consume;                //none consumed list not used yet
     int              num_non;
 }PCG_BLOCK;
 

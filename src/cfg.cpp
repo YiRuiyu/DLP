@@ -312,8 +312,9 @@ static void gen_cfg_edges(Func *func, cs_insn *insn)
 	// generate edges by checking the last instruction of each node, and
 	// update the in/out edges for the corresponding nodes
 	CFG_Node 	*node;
-	
+	//printf("The func entry is 0x%08lx\n", func->start_addr);
 	for (int i = 0; i < func->cfg.num_nodes + 1; i++) {
+		//printf("the block is %d\n", i);
 		node = &func->cfg.nodes[i];
 		new_edges(func, node, insn);
 	}
@@ -351,7 +352,7 @@ static int get_node_entries(Func *func, const cs_insn *insn, uint64_t **node_ent
 		if(insn[i].detail->groups[0] == 1)//branch instruction
 			*node_entries = bran_append(insn[i], *node_entries, &num);
 		else if(insn[i].id == 206 && i != func->len + index -1)//jal instruction
-			*node_entries = jal_append(insn[i], *node_entries, &num);
+			*node_entries = jal_append(func, insn[i], *node_entries, &num);
 		
 	}
 	return num;
@@ -404,14 +405,33 @@ static uint64_t* bran_append(cs_insn ins, uint64_t *list, int *num)
 
 
 
-static uint64_t* jal_append(cs_insn ins, uint64_t *list, int *num)
+static uint64_t* jal_append(Func *func ,cs_insn ins, uint64_t *list, int *num)
 {
-	uint64_t Nextaddr;
+	uint64_t Jmpaddr, Nextaddr, offset;
+	//uint64_t Nextaddr;
 	Nextaddr = ins.address + 0x4;
 
-	isFull(*num, &NUMBLOCK, &list);
-	if(!check_dup(list, Nextaddr, *num))
-		list[++*num] = Nextaddr;
+	if(ins.detail->riscv.operands[0].reg == 1)				// psuedo insturction j
+	{
+		offset = ins.detail->riscv.operands[1].imm;
+		Jmpaddr = ins.address + offset;
+
+		if((Jmpaddr < (func->start_addr + 0x4*(func->len-1))) && (Jmpaddr > func->start_addr))
+		{
+			isFull(*num, &NUMBLOCK, &list);
+			if(!check_dup(list, Jmpaddr, *num))
+				list[++*num] = Jmpaddr;
+		}
+
+		
+	}
+	else
+	{
+		isFull(*num, &NUMBLOCK, &list);
+		if(!check_dup(list, Nextaddr, *num))
+			list[++*num] = Nextaddr;
+	}
+	
 	
 	return list;
 }
@@ -458,6 +478,18 @@ static void new_edges(Func *func, CFG_Node *src, cs_insn *insn)
 		CFG_Edge *jal_edge = gen_edge(func, src, Jmp_addr, functioncall);
 		edge_append(func, jal_edge);
 	}
+	else if(id == 206 && riscv->operands[0].reg == 1)
+	{
+		offset = riscv->operands[1].imm;
+		Jmp_addr = addr + offset;
+
+		//force jump block
+		CFG_Edge *jmp_edge = gen_edge(func, src, Jmp_addr, forcejump);
+		
+		//update the func->cfg.edges
+		if(jmp_edge != NULL)
+			edge_append(func, jmp_edge);
+	}
 	else if(!isRet(id) && (addr != func->start_addr + 0x4*(func->len-1)))
 	{	
 		Next_addr = addr + 0x4;
@@ -477,6 +509,11 @@ static CFG_Edge* gen_edge(Func *func, CFG_Node *src, uint64_t addr, edgetype typ
 		edge->dst = search_node_jal(addr);
 	else 
 		edge->dst = search_node(func, addr);
+	if(edge->dst == NULL)
+	{
+		free(edge);
+		return NULL;
+	}
 	edge->type = type;
 	edge->src->out[0] = edge;
 	edge->dst->in[++edge->dst->num_in] = edge;
@@ -501,7 +538,8 @@ static CFG_Node* search_node(Func *func, uint64_t start_addr)
 	for(i = 0; i < func->cfg.num_nodes+1; i++)
 		if(func->cfg.nodes[i].start_addr == start_addr)
 			return &func->cfg.nodes[i];
-	printf("Could not find node in this func\n");
+	//printf("Could not find node in this func\n");
+	//printf("The addr is 0x%08lx\n", start_addr);
 	return NULL;
 }
 
@@ -514,7 +552,7 @@ static CFG_Node* search_node_jal(uint64_t start_addr)// for function call
 	for(i = 0; i < g_num_funcs + 1; i++)
 		if(g_func_list[i].start_addr == start_addr)
 			return &g_func_list[i].cfg.nodes[0];
-	printf("Could not find node in this func\n");
+	printf("Could not find node in this code\n");
 	return NULL;
 }
 
