@@ -72,7 +72,7 @@ static void gen_func_pcg(PCG_FUNC *pcg_func, cs_insn *insns)
 		pcg_func->blocks[i].node = &pcg_func->func->cfg.nodes[i];
         pcg_block = &(pcg_func->blocks[i]);
 		in_block_link(pcg_block, insns);                                  //Generate the in-block PCG completing *producer and *non_consume
-        //pre_block_link(pcg_func, pcg_block, insns);                       //Fill out-block data in PCG with the help of *non_consume and CFG
+        pre_block_link(pcg_func, pcg_block, insns);                       //Fill out-block data in PCG with the help of *non_consume and CFG
         //aft_block_link(pcg_func, pcg_block, insns);                       //If the instruction is in a loop, the producer can be generated in last loop which is in the block after it
 	}
     //dump_produce();
@@ -171,6 +171,7 @@ static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     PCG_BLOCK   *pre_block;
     cs_insn     *this_ins;                                                                  //current instruciton
     
+    printf("The block id is %d\n", pcg_block->node->id);
     pre_block_list = (int*)malloc(MAX_PRE_BLOCK * sizeof(base));
     num_list = find_pre_block(&pre_block_list, pcg_block);
     //dump_pre_block(pcg_block->node, pre_block_list, num_list);
@@ -178,13 +179,14 @@ static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     for(int offset = 0; offset < pcg_block->node->len - 1; offset++)                                               //for each instruction
     {
         this_ins = &insns[base + offset];
-        printf("The consumer instruction:Base = %d ", base);
-        printf("Offset = %d ", offset);
-        printf("0x%" PRIx64 "\n", this_ins->address);
+        printf("\tThe consumer instruction:Base = %d ", base);
+        printf("\tOffset = %d ", offset);
+        printf("\t0x%" PRIx64 "\n", this_ins->address);
         switch(isMissing(pcg_block->producer, offset, this_ins))                                               //have not found producer in in-block checking
         {
             case 0:
                 find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, insns, base, offset, 0);
+                break;
             case 1:
                 find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, insns, base, offset, 1);
                 break;
@@ -404,13 +406,16 @@ static void find_out_produce(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, int *pre_
     for(i = 0; i < num_list + 1; i++)                                   //for each pre block
     {
         index = pre_block_list[i];
-        printf("\tThe block id is %d\n", index);
+        printf("\t\tThe block id is %d\n", index);
         pre_block = &pcg_func->func->cfg.nodes[index];
         pb_base = (pre_block->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4;
-        for(pb_offset = pb_base + pre_block->len - 1; pb_offset >= pb_base; pb_offset--);     // avoid the last ins                //for each insn
+        // printf("This pre-block length is %d\n", pre_block->len);
+        // printf("The pb_offset is %d\n", pb_offset);
+        printf("\t\t\tDuring the finding process:This inctruction base is %d\n", pb_base);
+        for(pb_offset = (pb_base + pre_block->len - 1); pb_offset >= pb_base; pb_offset--)     // avoid the last ins                //for each insn
         {
-            printf("\tDuring the finding process:This inctruction base is %d, offset is %d, addr is0x%08lx\n", base, i-offset, insns[i].address);
-            printf("\tThe k value is %d\n", pos);
+            printf("\t\t\tDuring the finding process:This inctruction base is %d, offset is %d, addr is0x%08lx\n", pb_base, pb_offset, insns[pb_offset].address);
+            printf("\t\t\tThe k value is %d\n", pos);
             //for this_ins, this first half statement is aiming avoiding IMMs and the rest is for avoiding sw/sb/sh which cannot serve as producer, besides the operand cannot be ZERO
             if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH) && this_ins->detail->riscv.operands[pos].reg == insns[pb_offset].detail->riscv.operands[0].reg && this_ins->detail->riscv.operands[pos].reg != 1)
             {
