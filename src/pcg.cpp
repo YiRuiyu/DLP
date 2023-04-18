@@ -22,6 +22,7 @@
 #include "../include/BinaryCode.h" //only for testing
 
 #define MAX_NESTED 30
+#define MAX_PRE_BLOCK 9
 
 const int       *num_funcs = get_func_num();
 const int       *num_loops = get_loop_num();
@@ -53,7 +54,7 @@ void gen_pcg(cs_insn *insns)
         pcg_func = &(pcg_func_list[i]);
         gen_func_pcg(pcg_func, insns);
     }
-    //dump_produce();
+    dump_produce();
 }
 
 //Help function for this Part
@@ -103,9 +104,9 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
     for(int offset = pcg_block->node->len - 1; offset >= 0; offset--)                   //From block's bottom traverse to top
     {
         this_ins = &insns[base + offset];
-        //printf("Base = %d\n", base);
-        //printf("Offset = %d\n", offset);
-        //printf("0x%" PRIx64 "\n", this_ins->address);
+        printf("The consumer instruction:Base = %d ", base);
+        printf("Offset = %d ", offset);
+        printf("0x%" PRIx64 "\n", this_ins->address);
         if(is_auipc(this_ins->detail->riscv.op_count,this_ins->id))                   //TODO: To be considered
             continue;
         else if(is_compute(this_ins->detail->riscv.op_count))                        //Computing instructions(if its operands num is 3)
@@ -115,7 +116,10 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
         }
         //load do not have producers
         else if(this_ins->id == RISCV_INS_LB|| this_ins->id == RISCV_INS_LBU || this_ins->id == RISCV_INS_LD || this_ins->id == RISCV_INS_LH ||this_ins->id == RISCV_INS_LHU || this_ins->id == RISCV_INS_LW|| this_ins->id == RISCV_INS_LWU ||this_ins->id == RISCV_INS_LUI) 
-            continue;  
+        {  
+            pcg_block->producer[offset][0].type     = LW;
+            pcg_block->producer[offset][1].type     = LW;
+        } 
         //store have producers
         else if(this_ins->id == RISCV_INS_SW|| this_ins->id ==RISCV_INS_SB ||this_ins->id == RISCV_INS_SH)                                                                           
             find_in_produce(pcg_block, insns, base, offset, 0); 
@@ -164,33 +168,38 @@ static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     int         *pre_block_list;
     int          num_list;
     int          base;
-    int          index;
     PCG_BLOCK   *pre_block;
     cs_insn     *this_ins;                                                                  //current instruciton
     
+    pre_block_list = (int*)malloc(MAX_PRE_BLOCK * sizeof(base));
     num_list = find_pre_block(&pre_block_list, pcg_block);
-    base = pcg_block->node->start_addr/0x4;
-    for(int offset = 0; offset < pcg_block->node->len; offset++)                                               //for each instruction
+    //dump_pre_block(pcg_block->node, pre_block_list, num_list);
+    base = (pcg_block->node->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4;
+    for(int offset = 0; offset < pcg_block->node->len - 1; offset++)                                               //for each instruction
     {
-        index = base + offset;
-        this_ins = &insns[index];
-        
-        switch(isMissing(pcg_block->producer, offset))                                               //have not found producer in in-block checking
+        this_ins = &insns[base + offset];
+        printf("The consumer instruction:Base = %d ", base);
+        printf("Offset = %d ", offset);
+        printf("0x%" PRIx64 "\n", this_ins->address);
+        switch(isMissing(pcg_block->producer, offset, this_ins))                                               //have not found producer in in-block checking
         {
+            case 0:
+                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, insns, base, offset, 0);
             case 1:
-                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, this_ins, offset, 1);
+                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, insns, base, offset, 1);
                 break;
             case 2:
-                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, this_ins, offset, 2);
+                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, insns, base, offset, 2);
                 break;
             case 12:
-                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, this_ins, offset, 1);
-                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, this_ins, offset, 2);
+                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, insns, base, offset, 1);
+                find_out_produce(pcg_func, pcg_block, pre_block_list, num_list, insns, base, offset, 2);
                 break;
             default: continue;
         }
     }
-
+    free(pre_block_list);
+    pre_block_list = nullptr;
 }
 
 
@@ -209,17 +218,19 @@ static void aft_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     {
         this_ins = &insns[base + offset];                                                                                     
         
-        switch(isMissing(pcg_block->producer, offset))                                               //have not found producer in in-block checking
+        switch(isMissing(pcg_block->producer, offset, this_ins))                                               //have not found producer in in-block checking
         {
+            case 0:
+                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, insns, base, offset, 0);
             case 1:
-                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, this_ins, offset, 1);
+                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, insns, base, offset, 1);
                 break;
             case 2:
-                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, this_ins, offset, 2);
+                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, insns, base, offset, 2);
                 break;
             case 12:
-                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, this_ins, offset, 1);
-                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, this_ins, offset, 2);
+                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, insns, base, offset, 1);
+                find_out_produce(pcg_func, pcg_block, aft_block_list, num_list, insns, base, offset, 2);
                 break;
             default: continue;
         }
@@ -254,23 +265,25 @@ static void get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
         }
         else continue;
     }
-    //dump_pcg_func_list();
+    dump_pcg_func_list();
     return ;
 }
         
 
 
 
-static int isMissing(PCG_LINK **producers, int index)                       //TODO: Change it into 2-dimention array, and return 1 if op1 producer is missing, same with 2. all find is 0
+static int isMissing(PCG_LINK **producers, int index, cs_insn *this_ins)                       
                                                                              // 1: op1 producer is missing 2: op2 producer is missing 3: mem op producer is missuing 12: all missing
 {
-    if(producers[index][1].op == nullptr && producers[index][2].op == nullptr)
+    if((this_ins->id == RISCV_INS_SW|| this_ins->id ==RISCV_INS_SB ||this_ins->id == RISCV_INS_SH) && producers[index][0].type == NOTFIND)
+        return 0;
+    else if(producers[index][0].type == NOTFIND && producers[index][1].type == NOTFIND)
         return 12;
-    else if(producers[index][1].op == nullptr)
+    else if(producers[index][0].type == NOTFIND)
         return 1;
-    else if(producers[index][2].op == nullptr)
+    else if(producers[index][1].type == NOTFIND)
         return 2;
-    else return 0;
+    else return -1;
 
 }
 
@@ -283,12 +296,12 @@ static int find_pre_block(int **pre_block_list, PCG_BLOCK *block)
     num = -1;
     node = block->node;
     for(int i = 0; i < node->num_in + 1; i++)
-        if(!(node->in[i]->type == fallthrough && node[i].id == 0))           //avoiding fallthrough crossing blocks
+        if(node->in[i]->type != functioncall)
         {   
             num++;
-            *pre_block_list[num] = node->in[i]->src->id;
+            (*pre_block_list)[num] = node->in[i]->src->id;
         }        
-
+    
     return num;
 }
 
@@ -333,11 +346,18 @@ static void find_in_produce(PCG_BLOCK *pcg_block, cs_insn *insns, int base, int 
     //printf("Base = %d\n", base);
     //printf("Offset = %d\n", offset);
     this_ins = &insns[base + offset];
+    if(offset == 0)                                   //which means the first instruction of the block
+        if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_IMM)
+        {
+            pcg_block->producer[offset][pos-1].type     = LoopConst;
+            return;
+        }
     for(int i = base + offset - 1; i >= base; i--)                                   // -1 is for get rid of this_ins itself
     {
-        //printf("This iteration is %d\n", i);
-        //printf("The k value is %d\n", pos);
-        if(pos == 0)                                                                                                                          //this ins is store instruction
+        printf("\tDuring the finding process:This inctruction base is %d, offset is %d, addr is0x%08lx\n", base, i-offset, insns[i].address);
+        printf("\tThe k value is %d\n", pos);
+        
+        if(pos == 0)                                    //under SW situation                                                                                                                      //this ins is store instruction
         { 
             //for this_ins, this first half statement is aiming avoiding IMMs and the rest is for avoiding sw/sb/sh which cannot serve as producer, besides the operand cannot be ZERO
             if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH) && this_ins->detail->riscv.operands[pos].reg == insns[i].detail->riscv.operands[0].reg && this_ins->detail->riscv.operands[pos].reg != 1)
@@ -372,30 +392,82 @@ static void find_in_produce(PCG_BLOCK *pcg_block, cs_insn *insns, int base, int 
 }
 
 
-static void find_out_produce(PCG_FUNC *pcg_func, PCG_BLOCK *block, int *pre_block_list, int num_list, cs_insn *ins, int offset, int pos)
+static void find_out_produce(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, int *pre_block_list, int num_list, cs_insn *insns, int base, int offset, int pos)
 {
-    int          j;
-    int          index;
-    PCG_BLOCK   *pre_block;
+    int          i,j;
+    int          index, pb_base, pb_offset;
+    cs_insn     *this_ins;
+    CFG_Node    *pre_block;
+    PCG_LINK    *new_link;
 
-    for(int i = 0; i < num_list + 1; i++)                                   //for each pre block
+    this_ins = &insns[base + offset];
+    for(i = 0; i < num_list + 1; i++)                                   //for each pre block
     {
         index = pre_block_list[i];
-        pre_block = &pcg_func->blocks[index];
-        for(j = 0; j < pre_block->num_non + 1; j++);                    //for each non_consume
-            if(cmp_op(&pre_block->non_consume[j], ins, pos))
+        printf("\tThe block id is %d\n", index);
+        pre_block = &pcg_func->func->cfg.nodes[index];
+        pb_base = (pre_block->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4;
+        for(pb_offset = pb_base + pre_block->len - 1; pb_offset >= pb_base; pb_offset--);     // avoid the last ins                //for each insn
+        {
+            printf("\tDuring the finding process:This inctruction base is %d, offset is %d, addr is0x%08lx\n", base, i-offset, insns[i].address);
+            printf("\tThe k value is %d\n", pos);
+            //for this_ins, this first half statement is aiming avoiding IMMs and the rest is for avoiding sw/sb/sh which cannot serve as producer, besides the operand cannot be ZERO
+            if(this_ins->detail->riscv.operands[pos].type == RISCV_OP_REG && insns[i].id != (RISCV_INS_SW||RISCV_INS_SB||RISCV_INS_SH) && this_ins->detail->riscv.operands[pos].reg == insns[pb_offset].detail->riscv.operands[0].reg && this_ins->detail->riscv.operands[pos].reg != 1)
             {
-                block->producer[offset][pos - 1].op = pre_block->non_consume[j].op;
-                pre_block->non_consume[j].op = nullptr;
+                if(pos == 0)                                        //under SW situation
+                {
+                    if(pcg_block->producer[offset][pos].op == nullptr)
+                    {
+                        pcg_block->producer[offset][pos].block    = index;
+                        pcg_block->producer[offset][pos].id       = pb_offset - pb_base;
+                        pcg_block->producer[offset][pos].type     = CurrIter;
+                        pcg_block->producer[offset][pos].op       = &insns[pb_offset].detail->riscv.operands[0];
+                        break;
+                    }
+                    else
+                    {
+                        new_link = (PCG_LINK*)malloc(sizeof(PCG_LINK));
+                        new_link->block                         = index;
+                        new_link->id                            = pb_offset - pb_base;
+                        new_link->type                          = CurrIter;
+                        new_link->op                            = &insns[pb_offset].detail->riscv.operands[0];
+                        new_link->next                          = nullptr;
+                        pcg_block->producer[offset][pos].next   = new_link; 
+                        break;
+                    }
+                    
+                }
+                else
+                {
+                   if(pcg_block->producer[offset][pos-1].op == nullptr)
+                    {
+                        pcg_block->producer[offset][pos-1].block    = index;
+                        pcg_block->producer[offset][pos-1].id       = pb_offset - pb_base;
+                        pcg_block->producer[offset][pos-1].type     = CurrIter;
+                        pcg_block->producer[offset][pos-1].op       = &insns[pb_offset].detail->riscv.operands[0];
+                        break;
+                    }
+                    else
+                    {
+                        new_link = (PCG_LINK*)malloc(sizeof(PCG_LINK));
+                        new_link->block                             = index;
+                        new_link->id                                = pb_offset - pb_base;
+                        new_link->type                              = CurrIter;
+                        new_link->op                                = &insns[pb_offset].detail->riscv.operands[0];
+                        new_link->next                              = nullptr;
+                        pcg_block->producer[offset][pos-1].next     = new_link;
+                        break;
+                    }
+                }
             }
-                
+        }        
     }
 }
 
 
 static bool cmp_op(PCG_LINK *link, cs_insn *ins,int position)
 {
-    if(link->op->type == ins->detail->riscv.operands[position].type && link->op->reg == ins->detail->riscv.operands[position].reg)           // TODO: change it to adapt to mem not only considering about reg also offset
+    if(link->op->reg == ins->detail->riscv.operands[position].reg)           // TODO: change it to adapt to mem not only considering about reg also offset
             return true;
     else return false;
 }
@@ -406,9 +478,11 @@ static void init(PCG_BLOCK* pcg_block)
     // Initialize producers to nullptr
     for(int i = 0; i < pcg_block->node->len; i++) {
         for(int j = 0; j < 2; j++) {
-            pcg_block->producer[i][j].op = nullptr;
-            pcg_block->producer[i][j].id = -1;
-            pcg_block->producer[i][j].type = NOTFIND;
+            pcg_block->producer[i][j].op            = nullptr;
+            pcg_block->producer[i][j].block         = -77;
+            pcg_block->producer[i][j].id            = -77;
+            pcg_block->producer[i][j].type          = NOTFIND;
+            pcg_block->producer[i][j].next          = nullptr;
         }
     }
 
@@ -528,14 +602,18 @@ static void dump_pcg_func_list()
 }
 
 
-// static void dump_pre_block(int *list)
-// {
-
-// }
+static void dump_pre_block(CFG_Node *node, int *list, int num)
+{
+    printf("The %d block's pre_blocks are printed below:\n", node->id);
+    for(int i = 0; i < num + 1; i++)
+        printf("\t%d",list[i]);
+    printf("\n");
+}
 
 
 static void dump_produce()
 {
+    PCG_LINK *curr;
     int i, j, x, y;
     for(i = 0; i < num_pcg_func + 1; i++)
         for(j = 0; j < pcg_func_list[i].func->cfg.num_nodes + 1; j++)
@@ -543,7 +621,15 @@ static void dump_produce()
                 for(y = 0; y < 2; y++)
                 {
                     if(pcg_func_list[i].blocks[j].producer[x][y].type != NOTFIND)
-                        printf("The %2d Func %3d Block %3d Ins %3d rs' PRODUCE is %3d ins and type is %2d\n", i, j, x, y, pcg_func_list[i].blocks[j].producer[x][y].id, pcg_func_list[i].blocks[j].producer[x][y].type);
+                    {
+                        curr = &pcg_func_list[i].blocks[j].producer[x][y];
+                        while(curr != nullptr)
+                        {
+                            printf("The %2d Func %3d Block %3d Ins %3d rs' PRODUCE is %3d block %3d ins and type is %2d\n", i, j, x, y, curr->block, curr->id, curr->type);
+                            curr = curr->next;
+                        }
+                                                    
+                    }
                 }
 }
 
@@ -600,6 +686,7 @@ static bool is_auipc(int opcount,int id){
 static bool is_mem(int opcount,int id){
     return opcount==2 && id!=RISCV_INS_AUIPC;
 }
+
 
 void testpcg(void)
 {

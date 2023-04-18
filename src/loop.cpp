@@ -59,7 +59,7 @@ void gen_loop()
     //sort_nested();    No need sort by start_addr already in increasing end_addr
     count_nested();
     //dump out loop list
-    dump_loop();
+    //dump_loop();
 }
 
 

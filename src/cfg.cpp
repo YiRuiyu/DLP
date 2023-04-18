@@ -251,6 +251,7 @@ void gen_cfg(cs_insn *insn)
 		gen_cfg_edges(func, insn);
 		
 		//dump_cfg_edges(func);
+		//dump_cfg_nodes_in(func);
 	}
 }
 
@@ -482,10 +483,12 @@ static void new_edges(Func *func, CFG_Node *src, cs_insn *insn)
 	{
 		offset = riscv->operands[1].imm;
 		Jmp_addr = addr + offset;
-
+		
+		//printf("The src addr is 0x%08lx, Jmp_addr is 0x%08lx\n", src->start_addr, Jmp_addr);
 		//force jump block
 		CFG_Edge *jmp_edge = gen_edge(func, src, Jmp_addr, forcejump);
-		
+		// if(jmp_edge == NULL)
+		// 	printf("Have dropped this edge\n\n");
 		//update the func->cfg.edges
 		if(jmp_edge != NULL)
 			edge_append(func, jmp_edge);
@@ -516,7 +519,7 @@ static CFG_Edge* gen_edge(Func *func, CFG_Node *src, uint64_t addr, edgetype typ
 	}
 	edge->type = type;
 	edge->src->out[0] = edge;
-	edge->dst->in[++edge->dst->num_in] = edge;
+	edge->dst->in[++(edge->dst->num_in)] = edge;
 	return edge;
 }
 
@@ -604,6 +607,21 @@ static void dump_cfg_edges(Func *func)
 	}
 	printf("------------------------------------------------------------------------\n\n");
 	
+}
+
+
+static void dump_cfg_nodes_in(Func *func)
+{
+	int i,j;
+	printf("------------------------------------------------------------------------\n");
+	printf("the func start address is 0x%08lx\n", func->start_addr);
+	for(i = 0; i < func->cfg.num_nodes + 1; i++)
+	{
+		printf("The %d node information with %d edges-in: \n", i, func->cfg.nodes[i].num_in);
+		for(j = 0; j < func->cfg.nodes[i].num_in + 1; j++)
+			printf("\tThe %d edge_in is from block %d which start_addr is 0x%08lx, type is %d\n", j, func->cfg.nodes[i].in[j]->src->id, func->cfg.nodes[i].in[j]->src->start_addr, func->cfg.nodes[i].in[j]->type);
+	}
+
 }
 
 

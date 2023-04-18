@@ -14,7 +14,7 @@
 
 #define MAX_IN 16
 struct CFG_Edge_T; struct CFG_Node_T; struct Func_T; struct CFG_T;
-typedef enum edge_type{ functioncall = 1, ctrltrans, fallthrough, forcejump} edgetype;
+typedef enum edge_type{ functioncall = 1, ctrltrans, fallthrough, forcejump } edgetype;
 typedef struct CFG_Edge_T {
 	CFG_Node_T	*src;
 	CFG_Node_T	*dst;
@@ -74,6 +74,7 @@ static uint64_t* bran_append(cs_insn ins, uint64_t *list, int *num);
 static uint64_t* jal_append(Func *func, cs_insn ins, uint64_t *list, int *num);
 static void dump_cfg_nodes(Func *func);
 static void dump_cfg_edges(Func *func);
+static void dump_cfg_nodes_in(Func *func);
 void testcfg(void);
 const Func** get_func();
 const int* get_func_num();
