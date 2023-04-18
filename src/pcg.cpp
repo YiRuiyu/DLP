@@ -104,9 +104,9 @@ static void in_block_link(PCG_BLOCK *pcg_block, cs_insn *insns)
     for(int offset = pcg_block->node->len - 1; offset >= 0; offset--)                   //From block's bottom traverse to top
     {
         this_ins = &insns[base + offset];
-        printf("The consumer instruction:Base = %d ", base);
-        printf("Offset = %d ", offset);
-        printf("0x%" PRIx64 "\n", this_ins->address);
+        // printf("The consumer instruction:Base = %d ", base);
+        // printf("Offset = %d ", offset);
+        // printf("0x%" PRIx64 "\n", this_ins->address);
         if(is_auipc(this_ins->detail->riscv.op_count,this_ins->id))                   //TODO: To be considered
             continue;
         else if(is_compute(this_ins->detail->riscv.op_count))                        //Computing instructions(if its operands num is 3)
@@ -354,8 +354,8 @@ static void find_in_produce(PCG_BLOCK *pcg_block, cs_insn *insns, int base, int 
         }
     for(int i = base + offset - 1; i >= base; i--)                                   // -1 is for get rid of this_ins itself
     {
-        printf("\tDuring the finding process:This inctruction base is %d, offset is %d, addr is0x%08lx\n", base, i-offset, insns[i].address);
-        printf("\tThe k value is %d\n", pos);
+        // printf("\tDuring the finding process:This inctruction base is %d, offset is %d, addr is0x%08lx\n", base, i-offset, insns[i].address);
+        // printf("\tThe k value is %d\n", pos);
         
         if(pos == 0)                                    //under SW situation                                                                                                                      //this ins is store instruction
         { 
