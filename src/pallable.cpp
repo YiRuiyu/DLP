@@ -64,7 +64,7 @@ void de_parallelizable(cs_insn *insns)
                     break;
                 }
             }
-            if(!de_memory(pcg_func, (*nested_loops)[i], insns))
+            if(*num_nested >= 0 && !de_memory(pcg_func, (*nested_loops)[i], insns))
             {
                 del(i);                                             //delete this loop
                 i -= 1;
@@ -204,7 +204,9 @@ void tag()
     printf("\n\n\n");
     for (int p = 0; p < *num_pcg_func + 1; p++)                              //for each pcg_func
     {
-        pcg_func = (PCG_FUNC*)&((*pcg_func_list)[p]);                                   
+        pcg_func = (PCG_FUNC*)&((*pcg_func_list)[p]);   
+        if(*num_nested == -1)             
+            printf("This program cannot be parallel\n");                 
         for(int i = 0; i < *num_nested + 1; i++)                             //for each nested loop
         {
             if((*nested_loops)[i]->func != pcg_func->func && flag == 0)
@@ -252,7 +254,7 @@ void testpall(void)
     cs_insn *insn;//pointing at the instructions
 	std::string Code;
     uint64_t address;
-    if(GetCodeAndAddress("/home/rory/Desktop/32ia.riscv", Code, address))
+    if(GetCodeAndAddress("/home/rory/Desktop/test.riscv", Code, address))
     {
         unsigned char* Code_Hex = nullptr;
 
