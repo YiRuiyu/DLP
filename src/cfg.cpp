@@ -252,6 +252,7 @@ void gen_cfg(cs_insn *insn)
 		
 		//dump_cfg_edges(func);
 		//dump_cfg_nodes_in(func);
+		//dump_cfg_nodes_out(func);
 	}
 }
 
@@ -332,7 +333,8 @@ static CFG_Node* gen_node(Func *func, int i, uint64_t *node_entries, int num_nod
 	node->id = i;
 	node->start_addr = node_entries[i];
 	node->num_in = -1;
-	if(i == num_node_entries)// for the last one condition
+	node->out[0] = node->out[1] = nullptr;
+	if(i == num_node_entries)// for condition: the instruction is last one 
 		node->len = func->len - *total_len;
 	else node->len = (node_entries[i+1] - node_entries[i])/0x4;
 	return node;
@@ -518,7 +520,10 @@ static CFG_Edge* gen_edge(Func *func, CFG_Node *src, uint64_t addr, edgetype typ
 		return NULL;
 	}
 	edge->type = type;
-	edge->src->out[0] = edge;
+	if(edge->src->out[0] ==nullptr)
+		edge->src->out[0] = edge;
+	else
+		edge->src->out[1] = edge;
 	edge->dst->in[++(edge->dst->num_in)] = edge;
 	return edge;
 }
@@ -620,6 +625,23 @@ static void dump_cfg_nodes_in(Func *func)
 		printf("The %d node information with %d edges-in: \n", i, func->cfg.nodes[i].num_in);
 		for(j = 0; j < func->cfg.nodes[i].num_in + 1; j++)
 			printf("\tThe %d edge_in is from block %d which start_addr is 0x%08lx, type is %d\n", j, func->cfg.nodes[i].in[j]->src->id, func->cfg.nodes[i].in[j]->src->start_addr, func->cfg.nodes[i].in[j]->type);
+	}
+
+}
+
+
+static void dump_cfg_nodes_out(Func *func)
+{
+	int i,j;
+	printf("------------------------------------------------------------------------\n");
+	printf("the func start address is 0x%08lx\n", func->start_addr);
+	for(i = 0; i < func->cfg.num_nodes + 1; i++)
+	{
+		printf("The %d node information with %d edges-out: \n", i, 2);
+		for(j = 0; j < 2; j++)
+			if(func->cfg.nodes[i].out[j] == nullptr)
+				printf("\tThe %d edge_out is null\n", j);
+			else printf("\tThe %d edge_out is to block %d which start_addr is 0x%08lx, type is %d\n", j, func->cfg.nodes[i].out[j]->dst->id, func->cfg.nodes[i].out[j]->dst->start_addr, func->cfg.nodes[i].out[j]->type);
 	}
 
 }

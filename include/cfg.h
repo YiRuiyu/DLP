@@ -75,6 +75,7 @@ static uint64_t* jal_append(Func *func, cs_insn ins, uint64_t *list, int *num);
 static void dump_cfg_nodes(Func *func);
 static void dump_cfg_edges(Func *func);
 static void dump_cfg_nodes_in(Func *func);
+static void dump_cfg_nodes_out(Func *func);
 void testcfg(void);
 const Func** get_func();
 const int* get_func_num();

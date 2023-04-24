@@ -13,17 +13,19 @@
 
 struct LOOP_T;
 typedef struct LOOP_T{
-    Func_T      *func;
+    Func_T     *func;
     int         id;
+    int         src;
+    int         dst;
     uint64_t    start_addr;
     uint64_t    end_addr;
-    LOOP_T      *inside[MAX_INSIDE];
+    LOOP_T     *inside[MAX_INSIDE];
     int         num; 
 } LOOP;
 
 void  gen_loop();
 static bool  isBranch(cs_insn ins);
-static LOOP* isLoop(uint64_t jump, uint64_t addr, Func *func);
+static LOOP* isLoop(int src, int dst ,uint64_t jump, uint64_t addr, Func *func);
 static void  loop_append(LOOP *temp);
 static void  LoopisFull(int num, int *max, LOOP **list);
 static void  count_nested();

@@ -49,7 +49,7 @@ void gen_loop()
             {
                 addr = edge->src->start_addr + (edge->src->len - 1) * 0x4;
                 Jmp_addr = edge->dst->start_addr;
-                temp = isLoop(Jmp_addr, addr, func);
+                temp = isLoop(edge->src->id, edge->dst->id, Jmp_addr, addr, func);
                 loop_append(temp);
             }
             
@@ -72,12 +72,14 @@ static bool isBranch(cs_insn ins)
 
 
 
-static LOOP* isLoop(uint64_t jump, uint64_t addr, Func *func)
+static LOOP* isLoop(int src, int dst ,uint64_t jump, uint64_t addr, Func *func)
 {
     if(jump < addr)
     {
         LOOP *temp = (LOOP*) malloc(sizeof(LOOP));
         temp->id = ++num_loops;
+        temp->src = dst;
+        temp->dst = src;
         temp->start_addr = jump;
         temp->end_addr = addr;
         temp->num = -1;
@@ -117,11 +119,11 @@ static void count_nested()
 	int temp_id;
 	for(i = 0; i < num_loops + 1; i++)
 	{
-		for(j = i + 1; j < num_loops - i + 1; j++)
+		for(j = i - 1; j > 0; j--)
 		{
-            if(loop[i].start_addr >= loop[j].start_addr)
+            if(loop[j].start_addr >= loop[i].start_addr)
             {
-                loop[j].inside[++loop[j].num] = &(loop[i]);
+                loop[i].inside[++loop[i].num] = &(loop[j]);
                 break;
             }
         }        

@@ -15,6 +15,7 @@
 #include "../include/cfg.h"
 #include "../include/loop.h"
 #include "../include/pcg.h"
+#include "../include/pallable.h"
 
 int main (void)
 {
@@ -22,7 +23,8 @@ int main (void)
     //testdisasm();
     //testcfg();
     //testloop();
-    testpcg();
+    //testpcg();
+    testpall();
     return 0;
 }
 
