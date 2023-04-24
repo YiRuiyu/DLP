@@ -666,7 +666,7 @@ void testcfg(void)
     	insn = Disasm(Code_Hex, address, Code.length()/2, count);
 		
 		gen_func_list(insn, count);
-		//gen_cfg(insn);
+		gen_cfg(insn);
     }
 }
 

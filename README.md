@@ -9,7 +9,8 @@
     需要修改.riscv文件地址（目前写死在src/Getbinarycode.cpp testcode函数中，后续修改为接收参数）
 
 ### 编译：
-    $ g++ *.cpp -lcapstone
+    $ make && make clean 
+    目标文件生成在./software/analyzer
     
 ### 文件目录
     ./include .h头文件

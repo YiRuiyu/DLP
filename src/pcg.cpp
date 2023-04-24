@@ -54,7 +54,7 @@ void gen_pcg(cs_insn *insns)
         pcg_func = &(pcg_func_list[i]);
         gen_func_pcg(pcg_func, insns);
     }
-    dump_produce();
+    //dump_produce();
 }
 
 
@@ -246,8 +246,8 @@ static void pre_block_link(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *in
     
     // printf("The block id is %d\n", pcg_block->node->id);
     pre_block_list = (int*)malloc(MAX_PRE_BLOCK * sizeof(base));
-    num_list = find_pre_block(&pre_block_list, pcg_block);
-    dump_pre_block(pcg_block->node, pre_block_list, num_list);
+    num_list = find_pre_block(&pre_block_list, pcg_block, dst);
+    //dump_pre_block(pcg_block->node, pre_block_list, num_list);
     base = (pcg_block->node->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4;
     for(int offset = 0; offset < pcg_block->node->len - 1; offset++)                                               //for each instruction
     {
@@ -366,7 +366,7 @@ static void find_out_produce(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, int *pre_
 }
 
 
-static int find_pre_block(int **pre_block_list, PCG_BLOCK *block)
+static int find_pre_block(int **pre_block_list, PCG_BLOCK *block, int dst)
 {
     CFG_Node    *node;
     int          num;
@@ -374,7 +374,7 @@ static int find_pre_block(int **pre_block_list, PCG_BLOCK *block)
     num = -1;
     node = block->node;
     for(int i = 0; i < node->num_in + 1; i++)
-        if(node->in[i]->type != functioncall)
+        if(node->in[i]->type != functioncall && node->in[i]->src->id != dst)
         {   
             num++;
             (*pre_block_list)[num] = node->in[i]->src->id;
@@ -677,7 +677,7 @@ static void get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
         find_nested_loop(nested_loops, &num_nested, &(*loops)[i]);
 
     sort_loop(nested_loops, num_nested);                                    
-    dump_nested();
+    //dump_nested();
 
     *pcg_list = (PCG_FUNC*)malloc(num_nested * sizeof(PCG_FUNC));
     for(int i = 0; i < num_nested + 1; i++)                                 //get funcs where the loops belong to
@@ -694,7 +694,7 @@ static void get_looped_func(PCG_FUNC **pcg_list, const LOOP **loops)
         }
         else continue;
     }
-    dump_pcg_func_list();
+    //dump_pcg_func_list();
     return ;
 }
 
@@ -806,7 +806,7 @@ static void dump_pcg_func_list()
 
 static void dump_pre_block(CFG_Node *node, int *list, int num)
 {
-    printf("The %d block's pre_blocks are printed below:\n", node->id);
+    printf("The %d block's PRE_blocks are printed below:\n", node->id);
     for(int i = 0; i < num + 1; i++)
         printf("\t%d",list[i]);
     printf("\n");
@@ -815,10 +815,10 @@ static void dump_pre_block(CFG_Node *node, int *list, int num)
 
 static void dump_post_block(CFG_Node *node, int *list, int num)
 {
-    printf("The %d block's pre_blocks are printed below:\n", node->id);
+    printf("The %d block's POST_blocks are printed below:\n", node->id);
     for(int i = 0; i < num + 1; i++)
         printf("\t%d",list[i]);
-    printf("\n");
+    printf("\n\n");
 }
 
 

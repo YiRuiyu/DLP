@@ -16,5 +16,5 @@ bool de_computing(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, cs_insn *insns);
 void del(int i);
 bool is_com_pallable(PCG_FUNC *pcg_func, PCG_BLOCK *pcg_block, int offset, int flag);
 bool de_memory(PCG_FUNC *pcg_func, LOOP *loop, cs_insn *insns);
-void tag();
+void tag(cs_insn *insns);
 void testpall(void);

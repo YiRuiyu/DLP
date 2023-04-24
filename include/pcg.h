@@ -54,7 +54,7 @@ static bool is_compute(int opcount);
 static bool is_auipc(int opcount,int id);
 static bool is_mem(int opcount,int id);
 static int isMissing(PCG_LINK **producers, int index, cs_insn *this_ins);
-static int find_pre_block(int **pre_block_list, PCG_BLOCK *block);
+static int find_pre_block(int **pre_block_list, PCG_BLOCK *block, int dst);
 static int find_post_block(int **post_block_list,PCG_FUNC *pcg_func, PCG_BLOCK *block, int src, int dst);
 static bool check_int_duplicate(const int* list, int num, int temp);
 static bool cmp_op(PCG_LINK *link, cs_insn *ins,int position);

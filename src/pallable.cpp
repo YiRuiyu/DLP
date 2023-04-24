@@ -1,13 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////////////////
 // The main idea of pallable.cpp is designed for tell if each instruction can be set as Parallelizable
 // 
-//
-// First, determine all computing instruction if they are parallelizable.
-// 
-// 
-//
-//
-// 
 // by @YRY 24/4/2023
 // 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +66,7 @@ void de_parallelizable(cs_insn *insns)
         }
     }
 
-    tag();
+    tag(insns);
 }
 
 
@@ -195,9 +188,10 @@ bool de_memory(PCG_FUNC *pcg_func, LOOP *loop, cs_insn *insns)
 }
 
 
-void tag()
+void tag(cs_insn *insns)
 {
     int flag = 0;
+    int index;
     PCG_FUNC *pcg_func;
     PCG_BLOCK *pcg_block;
 
@@ -223,11 +217,24 @@ void tag()
                 for(int offset = 0; offset <= pcg_block->node->len - 1; offset++)                   //From block's bottom traverse to top
                 {
                     if(pcg_block->producer[offset][0].type == PrevSelf && (pcg_block->producer[offset][1].type == LoopConst || pcg_block->producer[offset][1].type == CurrIter || pcg_block->producer[offset][1].type == PrevIter))
-                        printf("The %d Func %d block %d ins is TreePara\n", p, j, offset);
+                    {
+                        index = (pcg_func->blocks[j].node->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4 + offset;
+                        printf("The %d Func %d block %d ins is TreePara\t", p, j, offset);
+                        printf("0x%" PRIx64 ":\t%s\t%s\n", insns[index].address, insns[index].mnemonic, insns[index].op_str);
+                    }
                     else if(pcg_block->producer[offset][0].type == AddrInduct && pcg_block->producer[offset][1].type == LoopConst)
-                        printf("The %d Func %d block %d ins is AddrPara\n", p, j, offset);
+                    {
+                        index = (pcg_func->blocks[j].node->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4 + offset;
+                        printf("The %d Func %d block %d ins is AddrPara\t", p, j, offset);
+                        printf("0x%" PRIx64 ":\t%s\t%s\n", insns[index].address, insns[index].mnemonic, insns[index].op_str);
+                    }
                     else
-                        printf("The %d Func %d block %d ins is FullPara\n", p, j, offset);
+                    {
+                        index = (pcg_func->blocks[j].node->start_addr - (*func_list)[0].cfg.nodes[0].start_addr)/0x4 + offset;
+                        printf("The %d Func %d block %d ins is FullPara\t", p, j, offset);
+                        printf("0x%" PRIx64 ":\t%s\t%s\n", insns[index].address, insns[index].mnemonic, insns[index].op_str);
+                    }
+                        
                 }
             }
                 
@@ -254,7 +261,7 @@ void testpall(void)
     cs_insn *insn;//pointing at the instructions
 	std::string Code;
     uint64_t address;
-    if(GetCodeAndAddress("/home/rory/Desktop/test.riscv", Code, address))
+    if(GetCodeAndAddress("/home/rory/Desktop/32ia.riscv", Code, address))
     {
         unsigned char* Code_Hex = nullptr;
 
